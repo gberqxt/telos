@@ -77,7 +77,7 @@ static const struct snd_pcm_hw_constraint_list densitron_rate_constraints = {
 #define FPGA_REG_ENCODER0            0x06  /* Right rotary - delta value */
 #define FPGA_REG_ENCODER1            0x07  /* Left rotary - delta value */
 #define FPGA_REG_STATUS              0x08  /* Signal status (read-only) */
-#define FPGA_REG_INT_STATUS          0x09  /* Interrupt status (R/W - write 0 to clear) */
+#define FPGA_REG_INT_STATUS          0x09  /* Interrupt status (R/W - write 1 to clear then 0 for reset) */
 #define FPGA_REG_SYSCTRL             0x0A  /* System control - audio routing */
 #define FPGA_REG_HEADSET_MIC_GAIN    0x0B
 #define FPGA_REG_FRONT_MIC_GAIN      0x0C
@@ -103,12 +103,12 @@ static const struct snd_pcm_hw_constraint_list densitron_rate_constraints = {
 #define FPGA_INT_ENCODER1            BIT(3)  /* slide1 (encoder 1 changed) */
 #define FPGA_INT_HP_DETECT           BIT(4)  /* headset detection changed */
 
-/* FPGA Interrupt Enable Register Bits (0x0E) - Write 1 to enable */
-#define FPGA_INT_EN_BUTTON0          BIT(0)  /* btn0 */
-#define FPGA_INT_EN_ENCODER0         BIT(1)  /* slide0 */
-#define FPGA_INT_EN_BUTTON1          BIT(2)  /* btn1 */
-#define FPGA_INT_EN_ENCODER1         BIT(3)  /* slide1 */
-#define FPGA_INT_EN_HP_DETECT        BIT(4)  /* hedest */
+/* FPGA Interrupt Mask Register Bits (0x0E) - Write 1 to mask (disable) interrupt */
+#define FPGA_INT_MSK_BUTTON0         BIT(0)  /* btn0 */
+#define FPGA_INT_MSK_ENCODER0        BIT(1)  /* slide0 */
+#define FPGA_INT_MSK_BUTTON1         BIT(2)  /* btn1 */
+#define FPGA_INT_MSK_ENCODER1        BIT(3)  /* slide1 */
+#define FPGA_INT_MSK_HP_DETECT       BIT(4)  /* hedest */
 
 /* FPGA System Control Register Bits (0x0A) */
 #define FPGA_SYSCTRL_SYS_RST         BIT(0)  /* System soft reset */
@@ -759,7 +759,7 @@ static int fpga_init(struct densitron_audio_priv *priv)
     }
     dev_dbg(&spi->dev, "INT_STATUS=0x%02X\n", active_irq);
     
-    /* Clear any pending interrupts by writing 0 to status register */
+    /* Clear any pending interrupts by writing 0xff to status register */
     ret = fpga_write_reg(spi, FPGA_REG_INT_STATUS, 0xFF);
     if (ret < 0) {
         dev_err(&spi->dev, "Failed to clear interrupt status\n");
@@ -1908,11 +1908,11 @@ static int densitron_audio_component_probe(struct snd_soc_component *component)
 {
     struct densitron_audio_priv *priv = snd_soc_component_get_drvdata(component);
     u8 status;
-    u8 int_enable = FPGA_INT_EN_HP_DETECT |    /* Headphone jack detection */
-                FPGA_INT_EN_BUTTON0 |       /* Button 0 */
-                FPGA_INT_EN_BUTTON1 |       /* Button 1 */
-                FPGA_INT_EN_ENCODER0 |      /* Rotary encoder 0 */
-                FPGA_INT_EN_ENCODER1;       /* Rotary encoder 1 */
+    u8 int_enable = FPGA_INT_MSK_HP_DETECT |    /* Headphone jack detection */
+                FPGA_INT_MSK_BUTTON0 |       /* Button 0 */
+                FPGA_INT_MSK_BUTTON1 |       /* Button 1 */
+                FPGA_INT_MSK_ENCODER0 |      /* Rotary encoder 0 */
+                FPGA_INT_MSK_ENCODER1;       /* Rotary encoder 1 */
     int ret;
 
     priv->component = component;
@@ -2283,11 +2283,11 @@ static ssize_t fpga_int_enable_show(struct device *dev,
                    (int_enable & BIT(2)) ? '1' : '0',
                    (int_enable & BIT(1)) ? '1' : '0',
                    (int_enable & BIT(0)) ? '1' : '0',
-                   !!(int_enable & FPGA_INT_EN_HP_DETECT),
-                   !!(int_enable & FPGA_INT_EN_ENCODER1),
-                   !!(int_enable & FPGA_INT_EN_BUTTON1),
-                   !!(int_enable & FPGA_INT_EN_ENCODER0),
-                   !!(int_enable & FPGA_INT_EN_BUTTON0));
+                   !!(int_enable & FPGA_INT_MSK_HP_DETECT),
+                   !!(int_enable & FPGA_INT_MSK_ENCODER1),
+                   !!(int_enable & FPGA_INT_MSK_BUTTON1),
+                   !!(int_enable & FPGA_INT_MSK_ENCODER0),
+                   !!(int_enable & FPGA_INT_MSK_BUTTON0));
 }
 
 static ssize_t fpga_int_enable_store(struct device *dev,
@@ -2381,6 +2381,132 @@ static ssize_t fpga_fw_version_show(struct device *dev,
     return scnprintf(buf, PAGE_SIZE, "%u (0x%02x)\n", fw_version, fw_version);
 }
 static DEVICE_ATTR_RO(fpga_fw_version);
+
+/* ============================================================================
+ * FPGA Audio Configuration Registers SYSFS Interface
+ * ============================================================================ */
+
+static ssize_t fpga_headset_mic_gain_show(struct device *dev,
+                                           struct device_attribute *attr, char *buf)
+{
+    struct densitron_audio_priv *priv = dev_get_drvdata(dev);
+    u8 gain;
+    int ret;
+    
+    ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_HEADSET_MIC_GAIN, &gain);
+    if (ret < 0)
+        return sprintf(buf, "Error: %d\n", ret);
+    
+    return sprintf(buf, "0x%02x (%u) = %+d dB\n", 
+                   gain, gain, mic_gain_hw_to_db(gain));
+}
+
+static ssize_t fpga_headset_mic_gain_store(struct device *dev,
+                                            struct device_attribute *attr,
+                                            const char *buf, size_t count)
+{
+    struct densitron_audio_priv *priv = dev_get_drvdata(dev);
+    unsigned long val;
+    int ret;
+    
+    ret = kstrtoul(buf, 0, &val);
+    if (ret)
+        return ret;
+    
+    if (val > 0xFF)
+        return -EINVAL;
+    
+    ret = fpga_write_reg(priv->fpga_spi, FPGA_REG_HEADSET_MIC_GAIN, (u8)val);
+    if (ret < 0)
+        return ret;
+    
+    priv->headset_mic_gain = val;
+    dev_dbg(dev, "Headset mic gain set to 0x%02x (%+d dB)\n", 
+            (u8)val, mic_gain_hw_to_db((u8)val));
+    return count;
+}
+static DEVICE_ATTR_RW(fpga_headset_mic_gain);
+
+static ssize_t fpga_front_mic_gain_show(struct device *dev,
+                                         struct device_attribute *attr, char *buf)
+{
+    struct densitron_audio_priv *priv = dev_get_drvdata(dev);
+    u8 gain;
+    int ret;
+    
+    ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_FRONT_MIC_GAIN, &gain);
+    if (ret < 0)
+        return sprintf(buf, "Error: %d\n", ret);
+    
+    return sprintf(buf, "0x%02x (%u) = %+d dB\n", 
+                   gain, gain, mic_gain_hw_to_db(gain));
+}
+
+static ssize_t fpga_front_mic_gain_store(struct device *dev,
+                                          struct device_attribute *attr,
+                                          const char *buf, size_t count)
+{
+    struct densitron_audio_priv *priv = dev_get_drvdata(dev);
+    unsigned long val;
+    int ret;
+    
+    ret = kstrtoul(buf, 0, &val);
+    if (ret)
+        return ret;
+    
+    if (val > 0xFF)
+        return -EINVAL;
+    
+    ret = fpga_write_reg(priv->fpga_spi, FPGA_REG_FRONT_MIC_GAIN, (u8)val);
+    if (ret < 0)
+        return ret;
+    
+    priv->front_mic_gain = val;
+    dev_dbg(dev, "Front mic gain set to 0x%02x (%+d dB)\n", 
+            (u8)val, mic_gain_hw_to_db((u8)val));
+    return count;
+}
+static DEVICE_ATTR_RW(fpga_front_mic_gain);
+
+static ssize_t fpga_hp_threshold_show(struct device *dev,
+                                       struct device_attribute *attr, char *buf)
+{
+    struct densitron_audio_priv *priv = dev_get_drvdata(dev);
+    u8 threshold;
+    int ret;
+    
+    ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_HP_THRESHOLD, &threshold);
+    if (ret < 0)
+        return sprintf(buf, "Error: %d\n", ret);
+    
+    return sprintf(buf, "0x%02x (%u)\n", threshold, threshold);
+}
+
+static ssize_t fpga_hp_threshold_store(struct device *dev,
+                                        struct device_attribute *attr,
+                                        const char *buf, size_t count)
+{
+    struct densitron_audio_priv *priv = dev_get_drvdata(dev);
+    unsigned long val;
+    int ret;
+    
+    ret = kstrtoul(buf, 0, &val);
+    if (ret)
+        return ret;
+    
+    if (val > 0xFF)
+        return -EINVAL;
+    
+    ret = fpga_write_reg(priv->fpga_spi, FPGA_REG_HP_THRESHOLD, (u8)val);
+    if (ret < 0)
+        return ret;
+    
+    dev_dbg(dev, "Headphone detection threshold set to 0x%02x\n", (u8)val);
+    return count;
+}
+static DEVICE_ATTR_RW(fpga_hp_threshold);
+
+
 
 
 /* ============================================================================
@@ -2697,11 +2823,11 @@ static ssize_t dump_all_show(struct device *dev,
                    !!(int_status & FPGA_INT_BUTTON0));
     len += snprintf(buf + len, PAGE_SIZE - len, "INT_ENABLE (0x0E):0x%02x  HP:%d ENC1:%d BTN1:%d ENC0:%d BTN0:%d\n",
                    int_enable,
-                   !!(int_enable & FPGA_INT_EN_HP_DETECT),
-                   !!(int_enable & FPGA_INT_EN_ENCODER1),
-                   !!(int_enable & FPGA_INT_EN_BUTTON1),
-                   !!(int_enable & FPGA_INT_EN_ENCODER0),
-                   !!(int_enable & FPGA_INT_EN_BUTTON0));
+                   !!(int_enable & FPGA_INT_MSK_HP_DETECT),
+                   !!(int_enable & FPGA_INT_MSK_ENCODER1),
+                   !!(int_enable & FPGA_INT_MSK_BUTTON1),
+                   !!(int_enable & FPGA_INT_MSK_ENCODER0),
+                   !!(int_enable & FPGA_INT_MSK_BUTTON0));
     len += snprintf(buf + len, PAGE_SIZE - len, "SYSCTRL (0x0A):   0x%02x  EMB_MIC:%d HP_MIC:%d HP:%d SPK:%d SAI_LOOP:%d",
                    !!(sysctrl & FPGA_SYSCTRL_FRONT_MIC_EN),
                    !!(sysctrl & FPGA_SYSCTRL_HEADSET_MIC_EN),
@@ -2914,6 +3040,9 @@ static ssize_t poll_all_show(struct device *dev,
     len += snprintf(buf + len, PAGE_SIZE - len, "  bit6 FRONT_MIC:  %d\n", !!(sysctrl & FPGA_SYSCTRL_FRONT_MIC_EN));
     len += snprintf(buf + len, PAGE_SIZE - len, "  bit5 HEADSET:    %d\n", !!(sysctrl & FPGA_SYSCTRL_HEADSET_EN));
     len += snprintf(buf + len, PAGE_SIZE - len, "  bit4 SPEAKER:    %d\n", !!(sysctrl & FPGA_SYSCTRL_SPEAKER_EN));
+    len += snprintf(buf + len, PAGE_SIZE - len, "  bit3 SAI_LOOP:   %d\n", !!(sysctrl & FPGA_SYSCTRL_SAI_LOOP));
+    len += snprintf(buf + len, PAGE_SIZE - len, "  bit2 ENC1_RST:   %d\n", !!(sysctrl & FPGA_SYSCTRL_ENC1_RST));
+    len += snprintf(buf + len, PAGE_SIZE - len, "  bit1 ENC0_RST:   %d\n", !!(sysctrl & FPGA_SYSCTRL_ENC0_RST));
     len += snprintf(buf + len, PAGE_SIZE - len, "  bit0 SYS_RST:    %d\n", !!(sysctrl & FPGA_SYSCTRL_SYS_RST));
     len += snprintf(buf + len, PAGE_SIZE - len, "\n");
     
@@ -2937,11 +3066,11 @@ static ssize_t poll_all_show(struct device *dev,
                    (int_enable & BIT(2)) ? '1' : '0',
                    (int_enable & BIT(1)) ? '1' : '0',
                    (int_enable & BIT(0)) ? '1' : '0');
-    len += snprintf(buf + len, PAGE_SIZE - len, "  bit4 HP_EN:      %d\n", !!(int_enable & FPGA_INT_EN_HP_DETECT));
-    len += snprintf(buf + len, PAGE_SIZE - len, "  bit3 ENC1_EN:    %d\n", !!(int_enable & FPGA_INT_EN_ENCODER1));
-    len += snprintf(buf + len, PAGE_SIZE - len, "  bit2 BTN1_EN:    %d\n", !!(int_enable & FPGA_INT_EN_BUTTON1));
-    len += snprintf(buf + len, PAGE_SIZE - len, "  bit1 ENC0_EN:    %d\n", !!(int_enable & FPGA_INT_EN_ENCODER0));
-    len += snprintf(buf + len, PAGE_SIZE - len, "  bit0 BTN0_EN:    %d\n", !!(int_enable & FPGA_INT_EN_BUTTON0));
+    len += snprintf(buf + len, PAGE_SIZE - len, "  bit4 HP_EN:      %d\n", !!(int_enable & FPGA_INT_MSK_HP_DETECT));
+    len += snprintf(buf + len, PAGE_SIZE - len, "  bit3 ENC1_EN:    %d\n", !!(int_enable & FPGA_INT_MSK_ENCODER1));
+    len += snprintf(buf + len, PAGE_SIZE - len, "  bit2 BTN1_EN:    %d\n", !!(int_enable & FPGA_INT_MSK_BUTTON1));
+    len += snprintf(buf + len, PAGE_SIZE - len, "  bit1 ENC0_EN:    %d\n", !!(int_enable & FPGA_INT_MSK_ENCODER0));
+    len += snprintf(buf + len, PAGE_SIZE - len, "  bit0 BTN0_EN:    %d\n", !!(int_enable & FPGA_INT_MSK_BUTTON0));
 
     if (len >= PAGE_SIZE)
         len = PAGE_SIZE - 1;
@@ -2968,6 +3097,9 @@ static struct attribute *densitron_audio_attrs[] = {
     &dev_attr_fpga_int_enable.attr,
     &dev_attr_fpga_sysctrl.attr,
     &dev_attr_fpga_fw_version.attr,
+    &dev_attr_fpga_headset_mic_gain.attr,
+    &dev_attr_fpga_front_mic_gain.attr,
+    &dev_attr_fpga_hp_threshold.attr,
     &dev_attr_irq_count.attr,
     &dev_attr_gpio_irq_value.attr,
     &dev_attr_headphones_connected.attr,
