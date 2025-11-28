@@ -2520,8 +2520,64 @@ static ssize_t fpga_hp_threshold_store(struct device *dev,
 }
 static DEVICE_ATTR_RW(fpga_hp_threshold);
 
+static ssize_t fpga_sai_loop_show(struct device *dev,
+                                   struct device_attribute *attr, char *buf)
+{
+    struct densitron_audio_priv *priv = dev_get_drvdata(dev);
+    u8 sysctrl;
+    int ret;
+    
+    ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_SYSCTRL, &sysctrl);
+    if (ret < 0)
+        return scnprintf(buf, PAGE_SIZE, "Error: %d\n", ret);
+    
+    return scnprintf(buf, PAGE_SIZE, "%d\n", 
+                     !!(sysctrl & FPGA_SYSCTRL_SAI_LOOP));
+}
 
-
+static ssize_t fpga_sai_loop_store(struct device *dev,
+                                    struct device_attribute *attr,
+                                    const char *buf, size_t count)
+{
+    struct densitron_audio_priv *priv = dev_get_drvdata(dev);
+    unsigned long val;
+    u8 sysctrl;
+    int ret;
+    
+    ret = kstrtoul(buf, 0, &val);
+    if (ret)
+        return ret;
+    
+    if (val > 1)
+        return -EINVAL;
+    
+    mutex_lock(&priv->hw_lock);  /* Protect against race conditions */
+    
+    /* Read current value */
+    ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_SYSCTRL, &sysctrl);
+    if (ret < 0) {
+        mutex_unlock(&priv->hw_lock);
+        return ret;
+    }
+    
+    /* Modify only SAI_LOOP bit */
+    if (val)
+        sysctrl |= FPGA_SYSCTRL_SAI_LOOP;
+    else
+        sysctrl &= ~FPGA_SYSCTRL_SAI_LOOP;
+    
+    /* Write back */
+    ret = fpga_write_reg(priv->fpga_spi, FPGA_REG_SYSCTRL, sysctrl);
+    
+    mutex_unlock(&priv->hw_lock);
+    
+    if (ret < 0)
+        return ret;
+    
+    dev_dbg(dev, "SAI_LOOP %s\n", val ? "enabled" : "disabled");
+    return count;
+}
+static DEVICE_ATTR_RW(fpga_sai_loop);
 
 /* ============================================================================
  * PCM1748 Debug sysfs Interface
@@ -3479,6 +3535,7 @@ static struct attribute *densitron_audio_attrs[] = {
     &dev_attr_fpga_int_status.attr,
     &dev_attr_fpga_int_enable.attr,
     &dev_attr_fpga_sysctrl.attr,
+    &dev_attr_fpga_sai_loop.attr,
     &dev_attr_fpga_fw_version.attr,
     &dev_attr_fpga_headset_mic_gain.attr,
     &dev_attr_fpga_front_mic_gain.attr,
@@ -3710,4 +3767,4 @@ module_platform_driver(densitron_audio_platform_driver);
 MODULE_DESCRIPTION("Densitron INF1000 Audio ASoC Driver");
 MODULE_AUTHOR("Gian Luca Bernocchi <gianluca.bernocchi@quixant.com>");
 MODULE_LICENSE("GPL");
-MODULE_VERSION("4.9");
+MODULE_VERSION("4.10");
