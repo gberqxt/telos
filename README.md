@@ -1,6 +1,6 @@
 # TLOS YOCTO PROJECT
 
-This repo contains docker configuration files and the densitron meta layer for Telos YOCTO project using NXP iMX8 pico board by AAEON.
+This repo contains docker configuration files and the densitron meta layer for Telos YOCTO project based on NXP iMX8p Pico board by AAEON.
 
 How to setup:
 

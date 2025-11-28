@@ -204,6 +204,11 @@ struct densitron_audio_priv {
     unsigned int headset_mic_gain;
     unsigned int front_mic_gain;
     
+    /* PCM1748 register cache (write-only chip) */
+    unsigned int pcm1748_mute;
+    unsigned int pcm1748_dac_ctrl;
+    unsigned int pcm1748_format;
+    
     /* Jack detection */
     struct snd_soc_jack headphone_jack;
     
@@ -643,6 +648,11 @@ static int pcm1748_init(struct densitron_audio_priv *priv)
     /* Store initial volume values */
     priv->hp_left_vol = 0xD8;
     priv->hp_right_vol = 0xD8;
+    
+    /* Store initial PCM1748 register values */
+    priv->pcm1748_mute = 0x00;
+    priv->pcm1748_dac_ctrl = 0x30;
+    priv->pcm1748_format = 0x05;
     
     dev_dbg(&spi->dev, "PCM1748 initialized: 24-bit LJ, -19.5dB, 48kHz, De-emphasis ON\n");
     return 0;
@@ -2445,8 +2455,20 @@ static ssize_t pcm1748_format_show(struct device *dev,
                                     struct device_attribute *attr, char *buf)
 {
     /* PCM1748 has no read capability - show what was last written */
-    return sprintf(buf, "0x01 (24-bit Left Justified)\n"
-                   "Note: PCM1748 is write-only, showing initialized value\n");
+    struct densitron_audio_priv *priv = dev_get_drvdata(dev);
+    u8 val = priv->pcm1748_format;
+    const char *fmt_str;
+    
+    switch (val & 0x07) {
+        case 0: fmt_str = "16-bit Right Justified"; break;
+        case 5: fmt_str = "24-bit Left Justified"; break;
+        case 6: fmt_str = "24-bit I2S"; break;
+        default: fmt_str = "Unknown"; break;
+    }
+    
+    return sprintf(buf, "0x%02x (%s)\n"
+                   "Note: PCM1748 is write-only, showing cached value\n",
+                   val, fmt_str);
 }
 
 static ssize_t pcm1748_format_store(struct device *dev,
@@ -2468,6 +2490,7 @@ static ssize_t pcm1748_format_store(struct device *dev,
     if (ret < 0)
         return ret;
     
+    priv->pcm1748_format = val;  /* Cache the written value */
     dev_dbg(dev, "PCM1748 Format Control set to 0x%02x\n", (u8)val);
     return count;
 }
@@ -2477,8 +2500,13 @@ static ssize_t pcm1748_mute_show(struct device *dev,
                                   struct device_attribute *attr, char *buf)
 {
     /* PCM1748 has no read capability - show what was last written */
-    return sprintf(buf, "0x00 (Unmuted)\n"
-                   "Note: PCM1748 is write-only, showing initialized value\n");
+    struct densitron_audio_priv *priv = dev_get_drvdata(dev);
+    
+    return sprintf(buf, "0x%02x (L:%s R:%s)\n"
+                   "Note: PCM1748 is write-only, showing cached value\n",
+                   priv->pcm1748_mute,
+                   (priv->pcm1748_mute & 0x01) ? "Muted" : "Unmuted",
+                   (priv->pcm1748_mute & 0x02) ? "Muted" : "Unmuted");
 }
 
 static ssize_t pcm1748_mute_store(struct device *dev,
@@ -2500,6 +2528,7 @@ static ssize_t pcm1748_mute_store(struct device *dev,
     if (ret < 0)
         return ret;
     
+    priv->pcm1748_mute = val;  /* Cache the written value */
     dev_dbg(dev, "PCM1748 Soft Mute set to 0x%02x\n", (u8)val);
     return count;
 }
@@ -2509,8 +2538,17 @@ static DEVICE_ATTR_RW(pcm1748_mute);
 static ssize_t pcm1748_dac_ctrl_show(struct device *dev,
                                       struct device_attribute *attr, char *buf)
 {
-    return sprintf(buf, "0x30 (De-emphasis: ON, Sample Rate: 48kHz, DACs: enabled)\n"
-                   "Note: PCM1748 is write-only, showing initialized value\n");
+    struct densitron_audio_priv *priv = dev_get_drvdata(dev);
+    u8 val = priv->pcm1748_dac_ctrl;
+    
+    return sprintf(buf, "0x%02x (De-emph:%s, Rate:%dkHz, L_DAC:%s, R_DAC:%s)\n"
+                   "Note: PCM1748 is write-only, showing cached value\n",
+                   val,
+                   (val & 0x10) ? "ON" : "OFF",
+                   ((val >> 5) & 0x03) == 1 ? 48 : 
+                   ((val >> 5) & 0x03) == 2 ? 44 : 32,
+                   (val & 0x01) ? "Disabled" : "Enabled",
+                   (val & 0x02) ? "Disabled" : "Enabled");
 }
 
 static ssize_t pcm1748_dac_ctrl_store(struct device *dev,
@@ -2532,6 +2570,7 @@ static ssize_t pcm1748_dac_ctrl_store(struct device *dev,
     if (ret < 0)
         return ret;
     
+    priv->pcm1748_dac_ctrl = val;  /* Cache the written value */
     dev_dbg(dev, "PCM1748 DAC Control (0x13) set to 0x%02x\n", (u8)val);
     return count;
 }
