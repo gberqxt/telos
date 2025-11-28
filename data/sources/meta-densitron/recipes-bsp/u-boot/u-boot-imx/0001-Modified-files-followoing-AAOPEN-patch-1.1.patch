@@ -1,0 +1,371 @@
+From 8c8ddac506a0beef7deaf0f24ee43879c9f1fd1a Mon Sep 17 00:00:00 2001
+From: ASE development tool <ase@densitron.com>
+Date: Fri, 10 Jan 2025 14:04:41 +0100
+Subject: [PATCH] Modified files followoing AAOPEN patch 1.1
+
+---
+ arch/arm/dts/imx8mp-evk-u-boot.dtsi |   4 +-
+ arch/arm/dts/imx8mp-evk.dts         | 218 +++++++++-------------------
+ 2 files changed, 69 insertions(+), 153 deletions(-)
+
+diff --git a/arch/arm/dts/imx8mp-evk-u-boot.dtsi b/arch/arm/dts/imx8mp-evk-u-boot.dtsi
+index 203d05e66ea..444c2534d41 100644
+--- a/arch/arm/dts/imx8mp-evk-u-boot.dtsi
++++ b/arch/arm/dts/imx8mp-evk-u-boot.dtsi
+@@ -76,7 +76,7 @@
+ 	u-boot,off-on-delay-us = <20000>;
+ };
+ 
+-&pinctrl_uart2 {
++&pinctrl_uart4 {
+ 	u-boot,dm-spl;
+ };
+ 
+@@ -112,7 +112,7 @@
+ 	u-boot,dm-spl;
+ };
+ 
+-&uart2 {
++&uart4 {
+ 	u-boot,dm-spl;
+ };
+ 
+diff --git a/arch/arm/dts/imx8mp-evk.dts b/arch/arm/dts/imx8mp-evk.dts
+index 61e8a701961..eeb38867780 100644
+--- a/arch/arm/dts/imx8mp-evk.dts
++++ b/arch/arm/dts/imx8mp-evk.dts
+@@ -13,8 +13,8 @@
+ 	compatible = "fsl,imx8mp-evk", "fsl,imx8mp";
+ 
+ 	chosen {
+-		bootargs = "console=ttymxc1,115200 earlycon=ec_imx6q,0x30890000,115200";
+-		stdout-path = &uart2;
++		bootargs = "console=ttymxc3,115200 earlycon=ec_imx6q,0x30a60000,115200";
++		stdout-path = &uart4;
+ 	};
+ 
+ 	gpio-leds {
+@@ -35,26 +35,27 @@
+ 		      <0x1 0x00000000 0 0xc0000000>;
+ 	};
+ 
+-	reg_can1_stby: regulator-can1-stby {
++	reg_usb1_host_vbus: regulator-usb1-vbus {
+ 		compatible = "regulator-fixed";
+-		regulator-name = "can1-stby";
++		regulator-name = "usb1_host_vbus";
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_flexcan1_reg>;
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
+-		gpio = <&gpio5 5 GPIO_ACTIVE_HIGH>;
+-		enable-active-high;
+-	};
+-
+-	reg_can2_stby: regulator-can2-stby {
++		pinctrl-0 = <&pinctrl_usb1_vbus>;
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio1 05 GPIO_ACTIVE_HIGH>;
++		enable-active-low;
++		regulator-always-on;
++	};
++	reg_usb2_host_vbus: regulator-usb2-vbus {
+ 		compatible = "regulator-fixed";
+-		regulator-name = "can2-stby";
++		regulator-name = "usb2_host_vbus";
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_flexcan2_reg>;
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
+-		gpio = <&gpio4 27 GPIO_ACTIVE_HIGH>;
+-		enable-active-high;
++		pinctrl-0 = <&pinctrl_usb2_vbus>;
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio1 06 GPIO_ACTIVE_HIGH>;
++		enable-active-low;
++		regulator-always-on;
+ 	};
+ 
+ 	reg_usdhc2_vmmc: regulator-usdhc2 {
+@@ -96,27 +97,29 @@
+ 		};
+ 	};
+ 
+-	cbtl04gp {
+-		compatible = "nxp,cbtl04gp";
++
++	/* TPM */
++	soft-spi {
++		compatible = "spi-gpio";
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_typec_mux>;
+-		switch-gpios = <&gpio4 20 GPIO_ACTIVE_LOW>;
+-		orientation-switch;
++		pinctrl-0 = <&pinctrl_ecspi2_gpio>;
++		cs-gpios = <&gpio5 13 0>;
++		gpio-sck = <&gpio5 10 0>;
++		gpio-mosi = <&gpio5 11 0>;
++		gpio-miso = <&gpio5 12 0>;
++		spi-delay-us = <1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
+ 
+-		port {
+-			usb3_data_ss: endpoint {
+-				remote-endpoint = <&typec_con_ss>;
+-			};
+-		};
++		tpm2:npct750@0 {
++			reg = <0>;
++			compatible = "tis,tpm2-spi";
++			spi-max-frequency = <1000000>;
++			gpio-reset = <&gpio1 15 GPIO_ACTIVE_LOW>;
++ 		};
+ 	};
+ };
+ 
+-&flexcan1 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_flexcan1>;
+-	xceiver-supply = <&reg_can1_stby>;
+-	status = "okay";
+-};
+ 
+ &eqos {
+ 	pinctrl-names = "default";
+@@ -138,13 +141,6 @@
+ 	};
+ };
+ 
+-&flexcan2 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_flexcan2>;
+-	xceiver-supply = <&reg_can2_stby>;
+-	status = "disabled";/* can2 pin conflict with pdm */
+-};
+-
+ &fec {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_fec>;
+@@ -320,46 +316,6 @@
+ 			};
+ 		};
+ 	};
+-
+-	ptn5110: tcpc@50 {
+-		compatible = "nxp,ptn5110";
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_typec>;
+-		reg = <0x50>;
+-		interrupt-parent = <&gpio4>;
+-		interrupts = <19 8>;
+-
+-		port {
+-			typec_dr_sw: endpoint {
+-				remote-endpoint = <&usb3_drd_sw>;
+-			};
+-		};
+-
+-		usb_con: connector {
+-			compatible = "usb-c-connector";
+-			label = "USB-C";
+-			power-role = "dual";
+-			data-role = "dual";
+-			try-power-role = "sink";
+-			source-pdos = <PDO_FIXED(5000, 3000, PDO_FIXED_USB_COMM)>;
+-			sink-pdos = <PDO_FIXED(5000, 3000, PDO_FIXED_USB_COMM)
+-				     PDO_VAR(5000, 20000, 3000)>;
+-			op-sink-microwatt = <15000000>;
+-			self-powered;
+-
+-			ports {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-
+-				port@1 {
+-					reg = <1>;
+-					typec_con_ss: endpoint {
+-						remote-endpoint = <&usb3_data_ss>;
+-					};
+-				};
+-			};
+-		};
+-	};
+ };
+ 
+ &i2c3 {
+@@ -371,12 +327,6 @@
+ 	sda-gpios = <&gpio5 19 GPIO_ACTIVE_HIGH>;
+ 	status = "okay";
+ 
+-	pca6416: gpio@20 {
+-		compatible = "ti,tca6416";
+-		reg = <0x20>;
+-		gpio-controller;
+-		#gpio-cells = <2>;
+-	};
+ };
+ 
+ &lcdif1 {
+@@ -403,21 +353,16 @@
+ 	status = "okay";
+ };
+ 
+-&uart2 {
++&uart4 {
+ 	/* console */
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_uart2>;
++	pinctrl-0 = <&pinctrl_uart4>;
++	/delete-property/ dmas;
++	/delete-property/ dmas-names;
+ 	status = "okay";
+ };
+ 
+ &usb3_phy0 {
+-	vbus-power-supply = <&ptn5110>;
+-	fsl,phy-tx-vref-tune = <0xe>;
+-	fsl,phy-tx-preemp-amp-tune = <3>;
+-	fsl,phy-tx-vboost-level = <5>;
+-	fsl,phy-comp-dis-tune = <7>;
+-	fsl,pcs-tx-deemph-3p5db = <0x21>;
+-	fsl,phy-pcs-tx-swing-full = <0x7f>;
+ 	status = "okay";
+ };
+ 
+@@ -426,24 +371,13 @@
+ };
+ 
+ &usb_dwc3_0 {
+-	dr_mode = "otg";
+-	hnp-disable;
+-	srp-disable;
+-	adp-disable;
+-	usb-role-switch;
+-	role-switch-default-mode = "none";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usb1_vbus>;
++	dr_mode = "host";
+ 	status = "okay";
+-
+-	port {
+-		usb3_drd_sw: endpoint {
+-			remote-endpoint = <&typec_dr_sw>;
+-		};
+-	};
+ };
+ 
+ &usb3_phy1 {
+-	fsl,phy-tx-preemp-amp-tune = <3>;
+-	fsl,phy-tx-vref-tune = <0xb>;
+ 	status = "okay";
+ };
+ 
+@@ -453,7 +387,7 @@
+ 
+ &usb_dwc3_1 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_usb1_vbus>;
++	pinctrl-0 = <&pinctrl_usb2_vbus>;
+ 	dr_mode = "host";
+ 	status = "okay";
+ };
+@@ -529,31 +463,6 @@
+ 		>;
+ 	};
+ 
+-	pinctrl_flexcan1: flexcan1grp {
+-		fsl,pins = <
+-			MX8MP_IOMUXC_SPDIF_RX__CAN1_RX          0x154
+-			MX8MP_IOMUXC_SPDIF_TX__CAN1_TX          0x154
+-		>;
+-	};
+-
+-	pinctrl_flexcan2: flexcan2grp {
+-		fsl,pins = <
+-			MX8MP_IOMUXC_SAI5_MCLK__CAN2_RX         0x154
+-			MX8MP_IOMUXC_SAI5_RXD3__CAN2_TX         0x154
+-		>;
+-	};
+-
+-	pinctrl_flexcan1_reg: flexcan1reggrp {
+-		fsl,pins = <
+-			MX8MP_IOMUXC_SPDIF_EXT_CLK__GPIO5_IO05  0x154   /* CAN1_STBY */
+-		>;
+-	};
+-
+-	pinctrl_flexcan2_reg: flexcan2reggrp {
+-		fsl,pins = <
+-			MX8MP_IOMUXC_SAI2_MCLK__GPIO4_IO27      0x154   /* CAN2_STBY */
+-		>;
+-	};
+ 
+ 	pinctrl_flexspi0: flexspi0grp {
+ 		fsl,pins = <
+@@ -626,17 +535,6 @@
+ 		>;
+ 	};
+ 
+-	pinctrl_typec: typec1grp {
+-		fsl,pins = <
+-			MX8MP_IOMUXC_SAI1_TXD7__GPIO4_IO19	0x1c4
+-		>;
+-	};
+-
+-	pinctrl_typec_mux: typec1muxgrp {
+-		fsl,pins = <
+-			MX8MP_IOMUXC_SAI1_MCLK__GPIO4_IO20	0x16
+-		>;
+-	};
+ 
+ 	pinctrl_reg_usdhc2_vmmc: regusdhc2vmmc {
+ 		fsl,pins = <
+@@ -644,19 +542,27 @@
+ 		>;
+ 	};
+ 
+-	pinctrl_uart2: uart2grp {
++	pinctrl_uart4: uart4grp {
+ 		fsl,pins = <
+-			MX8MP_IOMUXC_UART2_RXD__UART2_DCE_RX	0x140
+-			MX8MP_IOMUXC_UART2_TXD__UART2_DCE_TX	0x140
++			MX8MP_IOMUXC_UART4_RXD__UART4_DCE_RX	0x140
++			MX8MP_IOMUXC_UART4_TXD__UART4_DCE_TX	0x140
++			
+ 		>;
+ 	};
+ 
++
+ 	pinctrl_usb1_vbus: usb1grp {
+ 		fsl,pins = <
+-			MX8MP_IOMUXC_GPIO1_IO14__USB2_OTG_PWR	0x19
++			MX8MP_IOMUXC_GPIO1_IO05__GPIO1_IO05	0x19
+ 		>;
+ 	};
+ 
++	pinctrl_usb2_vbus: usb2grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_GPIO1_IO06__GPIO1_IO06	0x19
++ 		>;
++ 	};
++
+ 	pinctrl_usdhc2: usdhc2grp {
+ 		fsl,pins = <
+ 			MX8MP_IOMUXC_SD2_CLK__USDHC2_CLK	0x190
+@@ -752,4 +658,14 @@
+ 			MX8MP_IOMUXC_GPIO1_IO02__WDOG1_WDOG_B	0xc6
+ 		>;
+ 	};
++
++	pinctrl_ecspi2_gpio: ecspi2_gpio {
++		fsl,pins = <
++			MX8MP_IOMUXC_ECSPI2_SCLK__GPIO5_IO10	0x146
++			MX8MP_IOMUXC_ECSPI2_MOSI__GPIO5_IO11	0x146
++			MX8MP_IOMUXC_ECSPI2_MISO__GPIO5_IO12	0x146
++			MX8MP_IOMUXC_ECSPI2_SS0__GPIO5_IO13	0x146
++			MX8MP_IOMUXC_GPIO1_IO15__GPIO1_IO15	0x046
++		>;
++	};
+ };

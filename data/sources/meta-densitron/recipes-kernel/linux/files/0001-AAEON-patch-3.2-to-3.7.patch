@@ -1,0 +1,4396 @@
+From 5274f597e04c0ad819df65a83d02f26bb0158b11 Mon Sep 17 00:00:00 2001
+From: ASE development tool <ase@densitron.com>
+Date: Fri, 10 Jan 2025 16:07:29 +0100
+Subject: [PATCH] AAOPEN proposed patch 3.2 to 3.7
+
+---
+ arch/arm64/boot/dts/freescale/imx8mp-ab2.dts  |    2 +-
+ .../dts/freescale/imx8mp-evk-ecspi-slave.dts  |    2 +-
+ .../imx8mp-evk-it6263-lvds-dual-channel.dts   |    4 +-
+ .../imx8mp-evk-jdi-wuxga-lvds-panel.dts       |    2 +-
+ .../boot/dts/freescale/imx8mp-evk-rm67191.dts |   10 +-
+ .../boot/dts/freescale/imx8mp-evk-root.dts    |   10 +-
+ .../boot/dts/freescale/imx8mp-evk-rpmsg.dts   |   18 +-
+ arch/arm64/boot/dts/freescale/imx8mp-evk.dts  |  655 ++--
+ arch/arm64/boot/dts/freescale/imx8mp.dtsi     |    9 +-
+ drivers/net/usb/Makefile                      |    1 +
+ drivers/net/usb/qmi_wwan.c                    |   19 +-
+ drivers/net/usb/qmi_wwan_q.c                  | 2682 +++++++++++++++++
+ drivers/pci/controller/dwc/pci-imx6.c         |   38 +-
+ drivers/usb/serial/option.c                   |   19 +
+ drivers/usb/serial/qcserial.c                 |   30 +-
+ drivers/usb/serial/usb_wwan.c                 |   13 +
+ sound/soc/codecs/tlv320aic3x.c                |   14 +-
+ sound/soc/fsl/fsl_sai.c                       |    6 +-
+ 18 files changed, 3296 insertions(+), 238 deletions(-)
+ create mode 100644 drivers/net/usb/qmi_wwan_q.c
+
+diff --git a/arch/arm64/boot/dts/freescale/imx8mp-ab2.dts b/arch/arm64/boot/dts/freescale/imx8mp-ab2.dts
+index b8326433a4a9..03c026d67548 100755
+--- a/arch/arm64/boot/dts/freescale/imx8mp-ab2.dts
++++ b/arch/arm64/boot/dts/freescale/imx8mp-ab2.dts
+@@ -13,7 +13,7 @@ / {
+ 	compatible = "fsl,imx8mp-ab2", "fsl,imx8mp";
+ 
+ 	chosen {
+-		stdout-path = &uart2;
++		stdout-path = &uart4;
+ 	};
+ 
+ 	gpio-leds {
+diff --git a/arch/arm64/boot/dts/freescale/imx8mp-evk-ecspi-slave.dts b/arch/arm64/boot/dts/freescale/imx8mp-evk-ecspi-slave.dts
+index 800cdbafc6f2..9230c4f96a49 100644
+--- a/arch/arm64/boot/dts/freescale/imx8mp-evk-ecspi-slave.dts
++++ b/arch/arm64/boot/dts/freescale/imx8mp-evk-ecspi-slave.dts
+@@ -4,7 +4,7 @@
+ 
+ #include "imx8mp-evk.dts"
+ 
+-/delete-node/&spidev1;
++// /delete-node/&spidev1;
+ 
+ &ecspi2 {
+ 	#address-cells = <0>;
+diff --git a/arch/arm64/boot/dts/freescale/imx8mp-evk-it6263-lvds-dual-channel.dts b/arch/arm64/boot/dts/freescale/imx8mp-evk-it6263-lvds-dual-channel.dts
+index 69fe4aefd953..f6851310800d 100644
+--- a/arch/arm64/boot/dts/freescale/imx8mp-evk-it6263-lvds-dual-channel.dts
++++ b/arch/arm64/boot/dts/freescale/imx8mp-evk-it6263-lvds-dual-channel.dts
+@@ -4,11 +4,11 @@
+  */
+ 
+ #include "imx8mp-evk.dts"
+-
++/*
+ &lvds_bridge {
+ 	split-mode;
+ };
+-
++*/
+ &ldb {
+ 	fsl,dual-channel;
+ };
+diff --git a/arch/arm64/boot/dts/freescale/imx8mp-evk-jdi-wuxga-lvds-panel.dts b/arch/arm64/boot/dts/freescale/imx8mp-evk-jdi-wuxga-lvds-panel.dts
+index 3ea60784ba1b..479268214090 100644
+--- a/arch/arm64/boot/dts/freescale/imx8mp-evk-jdi-wuxga-lvds-panel.dts
++++ b/arch/arm64/boot/dts/freescale/imx8mp-evk-jdi-wuxga-lvds-panel.dts
+@@ -18,7 +18,7 @@ panel_lvds_in: endpoint {
+ 	};
+ };
+ 
+-/delete-node/ &lvds_bridge;
++
+ 
+ &ldb {
+ 	status = "okay";
+diff --git a/arch/arm64/boot/dts/freescale/imx8mp-evk-rm67191.dts b/arch/arm64/boot/dts/freescale/imx8mp-evk-rm67191.dts
+index 8110748ab202..691ebca43ae0 100644
+--- a/arch/arm64/boot/dts/freescale/imx8mp-evk-rm67191.dts
++++ b/arch/arm64/boot/dts/freescale/imx8mp-evk-rm67191.dts
+@@ -5,6 +5,7 @@
+ 
+ #include "imx8mp-evk.dts"
+ 
++/*
+ &adv_bridge {
+ 	status = "disabled";
+ };
+@@ -16,16 +17,15 @@ panel@0 {
+ 		pinctrl-0 = <&pinctrl_mipi_dsi_en>;
+ 		reset-gpio = <&gpio1 8 GPIO_ACTIVE_LOW>;
+ 		dsi-lanes = <4>;
+-		video-mode = <2>;	/* 0: burst mode
+-					 * 1: non-burst mode with sync event
+-					 * 2: non-burst mode with sync pulse
+-					 */
++		video-mode = <2>;	// 0: burst mode
++							// 1: non-burst mode with sync event
++							// 2: non-burst mode with sync pulse			 
+ 		panel-width-mm = <68>;
+ 		panel-height-mm = <121>;
+ 		status = "okay";
+ 	};
+ };
+-
++*/
+ &i2c2 {
+ 	synaptics_dsx_ts: synaptics_dsx_ts@20 {
+ 		compatible = "synaptics_dsx";
+diff --git a/arch/arm64/boot/dts/freescale/imx8mp-evk-root.dts b/arch/arm64/boot/dts/freescale/imx8mp-evk-root.dts
+index d3f69c0a07a1..ef86990e2e29 100644
+--- a/arch/arm64/boot/dts/freescale/imx8mp-evk-root.dts
++++ b/arch/arm64/boot/dts/freescale/imx8mp-evk-root.dts
+@@ -67,6 +67,7 @@ inmate_reserved: inmate@c0000000 {
+ 	alloc-ranges = <0 0x40000000 0 0x60000000>;
+ };
+ 
++/*
+ &iomuxc {
+ 	pinctrl_uart4: uart4grp {
+ 		fsl,pins = <
+@@ -75,25 +76,26 @@ MX8MP_IOMUXC_UART4_TXD__UART4_DCE_TX	0x140
+ 		>;
+ 	};
+ };
+-
++*/
+ &usdhc3 {
+ 	status = "disabled";
+ };
+ 
++/*
+ &uart4 {
+-	/delete-property/ dmas;	
+-	/delete-property/ dma-names;
++
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart4>;
+ 	status = "disabled";
+ };
+ 
+ &uart2 {
+-	/* uart4 is used by the 2nd OS, so configure pin and clk */
++
+ 	pinctrl-0 = <&pinctrl_uart2>, <&pinctrl_uart4>;
+ 	assigned-clocks = <&clk IMX8MP_CLK_UART4>;
+ 	assigned-clock-parents = <&clk IMX8MP_CLK_24M>;
+ };
++*/
+ 
+ &usdhc2 {
+ 	pinctrl-0 = <&pinctrl_usdhc3>, <&pinctrl_usdhc2>, <&pinctrl_usdhc2_gpio>;
+diff --git a/arch/arm64/boot/dts/freescale/imx8mp-evk-rpmsg.dts b/arch/arm64/boot/dts/freescale/imx8mp-evk-rpmsg.dts
+index 1488caac03fc..987dfde38740 100644
+--- a/arch/arm64/boot/dts/freescale/imx8mp-evk-rpmsg.dts
++++ b/arch/arm64/boot/dts/freescale/imx8mp-evk-rpmsg.dts
+@@ -157,6 +157,18 @@ pca6416: gpio@20 {
+ 		#gpio-cells = <2>;
+ 	};
+ 
++	pcf85063: pcf85063@51 {
++		compatible = "nxp,pcf85063";
++		reg = <0x51>;
++	};
++
++	tlv320aic3106: audio-codec@1b {
++		#sound-dai-cells = <0>;
++		compatible = "ti,tlv320aic3106";
++		reg = <0x1b>;
++		ai3x-micbias-vg = <1>;	/* 2.0V */
++	};
++
+ 	ov5640_1: ov5640_mipi@3c {
+ 		compatible = "ovti,ov5640";
+ 		reg = <0x3c>;
+@@ -189,6 +201,7 @@ codec: wm8960@1a {
+ 		reg = <0x1a>;
+ 		wlf,shared-lrclk;
+ 		SPKVDD1-supply = <&reg_audio_pwr>;
++		status = "disabled";
+ 	};
+ };
+ 
+@@ -197,7 +210,7 @@ &pwm4{
+ };
+ 
+ &sai3 {
+-	status = "disabled";
++	status = "okay";
+ };
+ 
+ &micfil {
+@@ -208,9 +221,6 @@ &sdma3{
+ 	status = "disabled";
+ };
+ 
+-&uart3 {
+-    status = "disabled";
+-};
+ 
+ &uart4 {
+ 	status = "disabled";
+diff --git a/arch/arm64/boot/dts/freescale/imx8mp-evk.dts b/arch/arm64/boot/dts/freescale/imx8mp-evk.dts
+index c451d4b2872b..d43b0e7ed9d6 100644
+--- a/arch/arm64/boot/dts/freescale/imx8mp-evk.dts
++++ b/arch/arm64/boot/dts/freescale/imx8mp-evk.dts
+@@ -13,7 +13,7 @@ / {
+ 	compatible = "fsl,imx8mp-evk", "fsl,imx8mp";
+ 
+ 	chosen {
+-		stdout-path = &uart2;
++		stdout-path = &uart4;
+ 	};
+ 
+ 	gpio-leds {
+@@ -33,7 +33,7 @@ memory@40000000 {
+ 		reg = <0x0 0x40000000 0 0xc0000000>,
+ 		      <0x1 0x00000000 0 0xc0000000>;
+ 	};
+-
++/*
+ 	reg_can1_stby: regulator-can1-stby {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "can1-stby";
+@@ -41,8 +41,8 @@ reg_can1_stby: regulator-can1-stby {
+ 		pinctrl-0 = <&pinctrl_flexcan1_reg>;
+ 		regulator-min-microvolt = <3300000>;
+ 		regulator-max-microvolt = <3300000>;
+-		gpio = <&gpio5 5 GPIO_ACTIVE_HIGH>;
+-		enable-active-high;
++		gpio = <&gpio5 5 GPIO_ACTIVE_LOW>;
++		enable-active-low;
+ 	};
+ 
+ 	reg_can2_stby: regulator-can2-stby {
+@@ -52,8 +52,20 @@ reg_can2_stby: regulator-can2-stby {
+ 		pinctrl-0 = <&pinctrl_flexcan2_reg>;
+ 		regulator-min-microvolt = <3300000>;
+ 		regulator-max-microvolt = <3300000>;
+-		gpio = <&gpio4 27 GPIO_ACTIVE_HIGH>;
++		gpio = <&gpio4 27 GPIO_ACTIVE_LOW>;
++		enable-active-low;
++	};
++*/
++	reg_pcie0: regulator-pcie {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_pcie0_reg>;
++		regulator-name = "MPCIE_3V3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio5 21 GPIO_ACTIVE_HIGH>; //PCIe_nWAKE_3V3
+ 		enable-active-high;
++		regulator-always-on;
+ 	};
+ 
+ 	reg_usdhc2_vmmc: regulator-usdhc2 {
+@@ -66,14 +78,48 @@ reg_usdhc2_vmmc: regulator-usdhc2 {
+ 		gpio = <&gpio2 19 GPIO_ACTIVE_HIGH>;
+ 		enable-active-high;
+ 	};
++	reg_usb1_vbus: regulator-usb1 {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_reg_usb1_vbus>;
++		regulator-name = "USB1_VBUS";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio1 05 GPIO_ACTIVE_HIGH>;
++		enable-active-low;
++		startup-delay-us = <100000>;
++		regulator-always-on;
++
++	};
++
++	reg_usb2_vbus: regulator-usb2 {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_reg_usb2_vbus>;
++		regulator-name = "USB2_VBUS";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio1 06 GPIO_ACTIVE_HIGH>;
++		enable-active-low;
++		startup-delay-us = <100000>;
++		regulator-always-on;
+ 
++	};
+ 	reg_audio_pwr: regulator-audio-pwr {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "audio-pwr";
+ 		regulator-min-microvolt = <3300000>;
+ 		regulator-max-microvolt = <3300000>;
+-		gpio = <&gpio4 29 GPIO_ACTIVE_HIGH>;
+-		enable-active-high;
++		/*gpio = <&gpio4 29 GPIO_ACTIVE_HIGH>;*/
++		/*enable-active-high;*/
++		regulator-always-on;
++	};
++
++	reg_audio_1v8: regulator-1p8v {
++		compatible = "regulator-fixed";
++		regulator-name = "1P8V";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
+ 		regulator-always-on;
+ 	};
+ 
+@@ -81,7 +127,7 @@ bt_sco_codec: bt_sco_codec {
+ 		#sound-dai-cells = <1>;
+ 		compatible = "linux,bt-sco";
+ 	};
+-
++/*
+ 	sound-bt-sco {
+ 		compatible = "simple-audio-card";
+ 		simple-audio-card,name = "bt-sco-audio";
+@@ -100,7 +146,7 @@ simple-audio-card,codec {
+ 			sound-dai = <&bt_sco_codec 1>;
+ 		};
+ 	};
+-
++*/
+ 	sound-hdmi {
+ 		compatible = "fsl,imx-audio-hdmi";
+ 		model = "audio-hdmi";
+@@ -116,6 +162,7 @@ sound-hdmi {
+ 		status = "okay";
+ 	};
+ 
++/*
+ 	sound-wm8960 {
+ 		compatible = "fsl,imx-audio-wm8960";
+ 		model = "wm8960-audio";
+@@ -134,6 +181,48 @@ sound-wm8960 {
+ 			"LINPUT3", "Mic Jack",
+ 			"Mic Jack", "MICB";
+ 	};
++*/
++
++	tlv320_mclk: clk-0 {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <12288000>;
++	};
++
++	sound-tlv320 {
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "tlv320-audio";
++		simple-audio-card,widgets =
++			"Line",    "Line Out",
++			"Line",    "Line In",
++			"Microphone",    "Microphone Jack";
++		simple-audio-card,routing =
++			"Line Out",	"LLOUT",
++			"Line Out",	"RLOUT",
++			"LINE1L",	"Line In",
++			"LINE1R",	"Line In",
++                        "MIC3L",	"Microphone Jack",
++			"MIC3R",	"Microphone Jack",
++                        "Microphone Jack",	"Mic Bias";
++		simple-audio-card,format = "dsp_b";
++                /*simple-audio-card,format = "i2s";*/
++                simple-audio-card,mclk-fs = <256>;
++		simple-audio-card,bitclock-master = <&sound_master>;
++		simple-audio-card,frame-master = <&sound_master>;
++		simple-audio-card,bitclock-inversion;
++
++		sound_master: simple-audio-card,cpu {
++			sound-dai = <&sai3>;
++		};
++
++		simple-audio-card,codec {
++			sound-dai = <&tlv320aic3106>;
++			clocks = <&audio_blk_ctrl IMX8MP_CLK_AUDIO_BLK_CTRL_SAI3_MCLK1>;
++                        /*clocks = <&tlv320_mclk>;*/
++		};
++
++	};
++
+ 
+ 	sound-micfil {
+ 		compatible = "fsl,imx-audio-card";
+@@ -158,45 +247,103 @@ cpu {
+ 		};
+ 	};
+ 
++	reg_lvds_pwr: regulator_lvdspwr {
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_lvds0_pwr>;
++		compatible = "regulator-fixed";
++		regulator-name = "lvds0_vdden";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio1 9 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++		regulator-always-on;
++	};
++
++	reg_lvds_backlight_pwr: regulator_lvdsblpwr {
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_lvds0_backlight_pwr>;
++		compatible = "regulator-fixed";
++		regulator-name = "lvds0_bl_en";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio1 10 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++		regulator-always-on;
++	};
++
++
+ 	lvds_backlight: lvds_backlight {
+ 		compatible = "pwm-backlight";
+-		pwms = <&pwm2 0 100000>;
++		pwms = <&pwm2 0 100000 0>;
++		power-supply = <&reg_lvds_backlight_pwr>;
+ 		status = "okay";
+ 
+-		brightness-levels = < 0  1  2  3  4  5  6  7  8  9
+-				     10 11 12 13 14 15 16 17 18 19
+-				     20 21 22 23 24 25 26 27 28 29
+-				     30 31 32 33 34 35 36 37 38 39
+-				     40 41 42 43 44 45 46 47 48 49
+-				     50 51 52 53 54 55 56 57 58 59
+-				     60 61 62 63 64 65 66 67 68 69
+-				     70 71 72 73 74 75 76 77 78 79
+-				     80 81 82 83 84 85 86 87 88 89
+-				     90 91 92 93 94 95 96 97 98 99
+-				    100>;
+-		default-brightness-level = <80>;
+-	};
+-
+-	cbtl04gp {
+-		compatible = "nxp,cbtl04gp";
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_typec_mux>;
+-		switch-gpios = <&gpio4 20 GPIO_ACTIVE_LOW>;
+-		orientation-switch;
+ 
++		brightness-levels = < 0   1   2   3   4   5   6   7   8   9
++				     10  11  12  13  14  15  16  17  18  19
++				     20  21  22  23  24  25  26  27  28  29
++				     30  31  32  33  34  35  36  37  38  39
++				     40  41  42  43  44  45  46  47  48  49
++				     50  51  52  53  54  55  56  57  58  59
++				     60  61  62  63  64  65  66  67  68  69
++				     70  71  72  73  74  75  76  77  78  79
++				     80  81  82  83  84  85  86  87  88  89
++				     90  91  92  93  94  95  96  97  98  99
++				     100 101 102 103 104 105 106 107 108 109
++				     110 111 112 113 114 115 116 117 118 119
++				     120 121 122 123 124 125 126 127 128 129
++				     130 131 132 133 134 135 136 137 138 139
++				     140 141 142 143 144 145 146 147 148 149
++				     150 151 152 153 154 155 156 157 158 159
++				     160 161 162 163 164 165 166 167 168 169
++				     170 171 172 173 174 175 176 177 178 179
++				     180 181 182 183 184 185 186 187 188 189
++				     190 191 192 193 194 195 196 197 198 199
++				     200 201 202 203 204 205 206 207 208 209
++				     210 211 212 213 214 215 216 217 218 219
++				     220 221 222 223 224 225 226 227 228 229
++				     230 231 232 233 234 235 236 237 238 239
++				     240 241 242 243 244 245 246 247 248 249
++				     250 251 252 253 254 255>;
++		default-brightness-level = <128>;
++		max-brightness = <255>;
++	};
++
++	lvds0_panel {
++
++		compatible = "panel-lvds";
++		backlight = <&lvds_backlight>;
++		power-supply = <&reg_lvds_pwr>;
++		data-mapping = "vesa-24";
++		data-width = <24>;
++		height-mm = <193>; /* 135.6 */
++		width-mm = <344>; /* 216.96 */
++		status = "okay";
++		panel-timing {
++			clock-frequency = <74250000>;
++			hactive = <1920>;
++			vactive = <1080>;
++			hback-porch = <148>;
++			hfront-porch = <88>;
++			vback-porch = <36>;
++			vfront-porch = <4>;
++			hsync-len = <44>;
++			vsync-len = <5>;
++		};
+ 		port {
+-			usb3_data_ss: endpoint {
+-				remote-endpoint = <&typec_con_ss>;
+-			};
++				panel_lvds_in: endpoint {
++					remote-endpoint = <&lvds_out>;
++				};
+ 		};
+ 	};
+ };
+ 
++
+ &flexspi {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_flexspi0>;
+ 	status = "okay";
+-
++/*
+ 	flash0: mt25qu256aba@0 {
+ 		reg = <0>;
+ 		#address-cells = <1>;
+@@ -206,22 +353,9 @@ flash0: mt25qu256aba@0 {
+ 		spi-tx-bus-width = <1>;
+ 		spi-rx-bus-width = <4>;
+ 	};
++*/
+ };
+ 
+-&flexcan1 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_flexcan1>;
+-	xceiver-supply = <&reg_can1_stby>;
+-	status = "okay";
+-};
+-
+-&flexcan2 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_flexcan2>;
+-	xceiver-supply = <&reg_can2_stby>;
+-	pinctrl-assert-gpios = <&pca6416 3 GPIO_ACTIVE_HIGH>;
+-	status = "disabled";/* can2 pin conflict with pdm */
+-};
+ 
+ &A53_0 {
+ 	cpu-supply = <&buck2>;
+@@ -243,28 +377,44 @@ &dsp {
+ 	status = "okay";
+ };
+ 
++/*
+ &pwm1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pwm1>;
+ 	status = "okay";
+ };
++*/
+ 
+ &pwm2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pwm2>;
+ 	status = "okay";
+ };
+-
++/*
+ &pwm4 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pwm4>;
+ 	status = "okay";
+ };
++*/
++
++
++
+ 
+ &aud2htx {
+ 	status = "okay";
+ };
+ 
++&ecspi1 {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	fsl,spi-num-chipselects = <1>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_ecspi1 &pinctrl_ecspi1_cs>;
++	cs-gpios = <&gpio5 9 GPIO_ACTIVE_LOW>;
++	status = "okay";
++};
++
+ &ecspi2 {
+ 	#address-cells = <1>;
+ 	#size-cells = <0>;
+@@ -274,10 +424,11 @@ &ecspi2 {
+ 	cs-gpios = <&gpio5 13 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ 
+-	spidev1: spi@0 {
++	tpm2:npct750@0 {
++		compatible = "tcg,tpm_tis-spi";
++		spi-max-frequency = <1000000>;
+ 		reg = <0>;
+-		compatible = "rohm,dh2228fv";
+-		spi-max-frequency = <500000>;
++		status = "okay";
+ 	};
+ };
+ 
+@@ -286,6 +437,7 @@ &eqos {
+ 	pinctrl-0 = <&pinctrl_eqos>;
+ 	phy-mode = "rgmii-id";
+ 	phy-handle = <&ethphy0>;
++	fsl,magic-packet;
+ 	snps,force_thresh_dma_mode;
+ 	snps,mtl-tx-config = <&mtl_tx_setup>;
+ 	snps,mtl-rx-config = <&mtl_rx_setup>;
+@@ -371,9 +523,9 @@ mdio {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 
+-		ethphy1: ethernet-phy@1 {
++		ethphy1: ethernet-phy@2 {
+ 			compatible = "ethernet-phy-ieee802.3-c22";
+-			reg = <1>;
++			reg = <2>;
+ 			eee-broken-1000t;
+ 			reset-gpios = <&gpio4 2 GPIO_ACTIVE_LOW>;
+ 			reset-assert-us = <10000>;
+@@ -384,6 +536,23 @@ ethphy1: ethernet-phy@1 {
+ 	};
+ };
+ 
++/*
++&flexcan1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_flexcan1>;
++	xceiver-supply = <&reg_can1_stby>;
++	status = "okay";
++};
++
++&flexcan2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_flexcan2>;
++	xceiver-supply = <&reg_can2_stby>;
++	status = "okay";
++};
++*/
++
++
+ &i2c1 {
+ 	clock-frequency = <400000>;
+ 	pinctrl-names = "default";
+@@ -492,6 +661,7 @@ &i2c2 {
+ 	pinctrl-0 = <&pinctrl_i2c2>;
+ 	status = "okay";
+ 
++/*
+ 	adv_bridge: adv7535@3d {
+ 		compatible = "adi,adv7535";
+ 		reg = <0x3d>;
+@@ -505,19 +675,18 @@ adv7535_from_dsim: endpoint {
+ 			};
+ 		};
+ 	};
+-
+-	lvds_bridge: lvds-to-hdmi-bridge@4c {
+-		compatible = "ite,it6263";
+-		reg = <0x4c>;
+-		reset-gpios = <&gpio1 10 GPIO_ACTIVE_LOW>;
+-
+-		port {
+-			it6263_in: endpoint {
+-				remote-endpoint = <&lvds_out>;
+-			};
++*/
++	baseboard_eeprom: baseboard_eeprom@57 {
++		compatible = "atmel,24c02";
++		reg = <0x57>;
++		/* read-only; */
++		#address-cells = <1>;
++		#size-cells = <1>;
++		baseboard_data: baseboard_data@0 {
++			reg = <0 0x100>;
+ 		};
+-	};
+-
++	};	
++	
+ 	ov5640_0: ov5640_mipi@3c {
+ 		compatible = "ovti,ov5640";
+ 		reg = <0x3c>;
+@@ -544,46 +713,6 @@ ov5640_mipi_0_ep: endpoint {
+ 			};
+ 		};
+ 	};
+-
+-	ptn5110: tcpc@50 {
+-		compatible = "nxp,ptn5110";
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_typec>;
+-		reg = <0x50>;
+-		interrupt-parent = <&gpio4>;
+-		interrupts = <19 8>;
+-
+-		port {
+-			typec_dr_sw: endpoint {
+-				remote-endpoint = <&usb3_drd_sw>;
+-			};
+-		};
+-
+-		usb_con: connector {
+-			compatible = "usb-c-connector";
+-			label = "USB-C";
+-			power-role = "dual";
+-			data-role = "dual";
+-			try-power-role = "sink";
+-			source-pdos = <PDO_FIXED(5000, 3000, PDO_FIXED_USB_COMM)>;
+-			sink-pdos = <PDO_FIXED(5000, 3000, PDO_FIXED_USB_COMM)
+-				     PDO_VAR(5000, 20000, 3000)>;
+-			op-sink-microwatt = <15000000>;
+-			self-powered;
+-
+-			ports {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-
+-				port@1 {
+-					reg = <1>;
+-					typec_con_ss: endpoint {
+-						remote-endpoint = <&usb3_data_ss>;
+-					};
+-				};
+-			};
+-		};
+-	};
+ };
+ 
+ &i2c3 {
+@@ -608,6 +737,22 @@ codec: wm8960@1a {
+ 		wlf,hp-cfg = <3 2 3>;
+ 		wlf,gpio-cfg = <1 3>;
+ 		SPKVDD1-supply = <&reg_audio_pwr>;
++                status = "disabled";
++	};
++
++	tlv320aic3106: audio-codec@1b {
++		#sound-dai-cells = <0>;
++		compatible = "ti,tlv320aic3106";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_tlv320>;
++		reg = <0x1b>;
++		ai3x-micbias-vg = <1>;
++		reset-gpios = <&gpio2 9 GPIO_ACTIVE_LOW>;
++                IOVDD-supply = <&reg_audio_pwr>; 
++                DVDD-supply = <&reg_audio_1v8>; 
++                AVDD-supply = <&reg_audio_pwr>; 
++                DRVDD-supply = <&reg_audio_pwr>;
++		status = "okay";
+ 	};
+ 
+ 	ov5640_1: ov5640_mipi@3c {
+@@ -638,6 +783,14 @@ ov5640_mipi_1_ep: endpoint {
+ 	};
+ };
+ 
++
++&i2c5 {
++	clock-frequency = <400000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c5>;
++	status = "okay";
++};
++
+ &irqsteer_hdmi {
+ 	status = "okay";
+ };
+@@ -674,29 +827,35 @@ &lcdif3 {
+ };
+ 
+ &ldb {
+-	status = "okay";
++        status = "okay";
++        fsl,dual-channel;
+ 
+-	lvds-channel@0 {
+-		fsl,data-mapping = "jeida";
++        lvds-channel@0 {
++		fsl,data-mapping = "spwg";
+ 		fsl,data-width = <24>;
+ 		status = "okay";
++                /delete-node/ port@1;
+ 
+-		port@1 {
+-			reg = <1>;
++                port@1 {
++                        reg = <1>;
+ 
+-			lvds_out: endpoint {
+-				remote-endpoint = <&it6263_in>;
+-			};
+-		};
+-	};
++                        lvds_out: endpoint {
++                                remote-endpoint = <&panel_lvds_in>;
++                        };
++                };
++        };
+ };
+ 
++
++
+ &ldb_phy {
+ 	status = "okay";
+ };
+ 
++/*
+ &mipi_dsi {
+-	status = "okay";
++	status = "disabled";
++
+ 
+ 	port@1 {
+ 		dsim_to_adv7535: endpoint {
+@@ -705,6 +864,16 @@ dsim_to_adv7535: endpoint {
+ 		};
+ 	};
+ };
++*/
++&sai2 {
++	#sound-dai-cells = <0>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_sai2>;
++	assigned-clocks = <&clk IMX8MP_CLK_SAI2>;
++	assigned-clock-parents = <&clk IMX8MP_AUDIO_PLL1_OUT>;
++	assigned-clock-rates = <12288000>;
++	status = "okay";
++};
+ 
+ &snvs_pwrkey {
+ 	status = "okay";
+@@ -728,9 +897,8 @@ &micfil {
+ &pcie{
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pcie>;
+-	disable-gpio = <&gpio2 6 GPIO_ACTIVE_LOW>;
+-	reset-gpio = <&gpio2 7 GPIO_ACTIVE_LOW>;
+-	ext_osc = <1>;
++	reset-gpio = <&gpio4 19 GPIO_ACTIVE_LOW>;
++	ext_osc = <0>;
+ 	clocks = <&clk IMX8MP_CLK_HSIO_ROOT>,
+ 		 <&clk IMX8MP_CLK_PCIE_AUX>,
+ 		 <&clk IMX8MP_CLK_HSIO_AXI>,
+@@ -744,18 +912,12 @@ &pcie{
+ 	l1ss-disabled;
+ 	status = "okay";
+ 
+-	wifi_wake_host {
+-		compatible = "nxp,wifi-wake-host";
+-		interrupt-parent = <&gpio5>;
+-		interrupts = <21 IRQ_TYPE_LEVEL_LOW>;
+-		interrupt-names = "host-wake";
+-	};
+ };
+ 
+ &pcie_ep{
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pcie>;
+-	ext_osc = <1>;
++	ext_osc = <0>;
+ 	clocks = <&clk IMX8MP_CLK_HSIO_ROOT>,
+ 		 <&clk IMX8MP_CLK_PCIE_AUX>,
+ 		 <&clk IMX8MP_CLK_HSIO_AXI>,
+@@ -770,26 +932,18 @@ &pcie_ep{
+ };
+ 
+ &pcie_phy{
+-	ext_osc = <1>;
++	ext_osc = <0>;
+ 	status = "okay";
+ };
+ 
+-&sai2 {
+-	#sound-dai-cells = <0>;
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_sai2>;
+-	assigned-clocks = <&clk IMX8MP_CLK_SAI2>;
+-	assigned-clock-parents = <&clk IMX8MP_AUDIO_PLL1_OUT>;
+-	assigned-clock-rates = <12288000>;
+-	status = "okay";
+-};
+ 
+ &sai3 {
++	#sound-dai-cells = <0>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_sai3>;
+ 	assigned-clocks = <&clk IMX8MP_CLK_SAI3>;
+ 	assigned-clock-parents = <&clk IMX8MP_AUDIO_PLL1_OUT>;
+-	assigned-clock-rates = <12288000>;
++        assigned-clock-rates = <0>, <12288000>, <24288000>, <36864000>;
+ 	clocks = <&audio_blk_ctrl IMX8MP_CLK_AUDIO_BLK_CTRL_SAI3_IPG>, <&clk IMX8MP_CLK_DUMMY>,
+ 		 <&audio_blk_ctrl IMX8MP_CLK_AUDIO_BLK_CTRL_SAI3_MCLK1>, <&clk IMX8MP_CLK_DUMMY>,
+ 		 <&clk IMX8MP_CLK_DUMMY>;
+@@ -807,7 +961,7 @@ &sdma2 {
+ 	status = "okay";
+ };
+ 
+-&uart1 { /* BT */
++&uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart1>;
+ 	assigned-clocks = <&clk IMX8MP_CLK_UART1>;
+@@ -817,14 +971,47 @@ &uart1 { /* BT */
+ };
+ 
+ &uart2 {
+-	/* console */
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart2>;
++	uart-has-rtscts;
++	fsl,dce-mode;
+ 	status = "okay";
+ };
+ 
++
++&uart4 { /* console */
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart4>;
++	/delete-property/ dmas;
++	/delete-property/ dmas-names;
++	status = "okay";
++};
++/*
++&uart3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart3>;
++	assigned-clocks = <&clk IMX8MP_CLK_UART3>;
++	assigned-clock-parents = <&clk IMX8MP_SYS_PLL1_80M>;
++	fsl,uart-has-rtscts;
++	fsl,dce-mode;
++	status = "okay";
++};
++*/
++
++
++/*
++&uart4 {
++
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart4>;
++	assigned-clocks = <&clk IMX8MP_CLK_UART4>;
++	assigned-clock-parents = <&clk IMX8MP_SYS_PLL1_80M>;
++	fsl,uart-has-rtscts;
++	status = "okay";
++};
++*/
++
+ &usb3_phy0 {
+-	vbus-power-supply = <&ptn5110>;
+ 	fsl,phy-tx-vref-tune = <0xe>;
+ 	fsl,phy-tx-preemp-amp-tune = <3>;
+ 	fsl,phy-tx-vboost-level = <5>;
+@@ -836,24 +1023,15 @@ &usb3_phy0 {
+ 
+ &usb3_0 {
+ 	status = "okay";
++	connector {
++		compatible = "usb-a-connector";
++		vbus-supply = <&reg_usb1_vbus>;
++	};
+ };
+ 
+ &usb_dwc3_0 {
+-	dr_mode = "otg";
+-	hnp-disable;
+-	srp-disable;
+-	adp-disable;
+-	usb-role-switch;
+-	role-switch-default-mode = "none";
+-	snps,dis-u1-entry-quirk;
+-	snps,dis-u2-entry-quirk;
++	dr_mode = "host";
+ 	status = "okay";
+-
+-	port {
+-		usb3_drd_sw: endpoint {
+-			remote-endpoint = <&typec_dr_sw>;
+-		};
+-	};
+ };
+ 
+ &usb3_phy1 {
+@@ -864,24 +1042,17 @@ &usb3_phy1 {
+ 
+ &usb3_1 {
+ 	status = "okay";
++	connector {
++		compatible = "usb-a-connector";
++		vbus-supply = <&reg_usb2_vbus>;
++	};
+ };
+ 
+ &usb_dwc3_1 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_usb1_vbus>;
+ 	dr_mode = "host";
+ 	status = "okay";
+ };
+ 
+-&uart3 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_uart3>;
+-	assigned-clocks = <&clk IMX8MP_CLK_UART3>;
+-	assigned-clock-parents = <&clk IMX8MP_SYS_PLL1_80M>;
+-	fsl,uart-has-rtscts;
+-	status = "okay";
+-};
+-
+ &usdhc2 {
+ 	assigned-clocks = <&clk IMX8MP_CLK_USDHC2>;
+ 	assigned-clock-rates = <400000000>;
+@@ -928,39 +1099,67 @@ MX8MP_IOMUXC_HDMI_CEC__HDMIMIX_HDMI_CEC		0x40000010
+ 			 * M.2 pin20 & pin21 need to be set to 11 for 88W9098 to select the
+ 			 * default Reference Clock Frequency
+ 			 */
+-			MX8MP_IOMUXC_SD1_DATA7__GPIO2_IO09		0x1c4
++
++			 //MX8MP_IOMUXC_SD1_DATA6__GPIO2_IO08         0x00000106
+ 		>;
+ 	};
+-
++/*
+ 	pinctrl_pwm1: pwm1grp {
+ 		fsl,pins = <
+ 			MX8MP_IOMUXC_GPIO1_IO01__PWM1_OUT	0x116
+ 		>;
+ 	};
+-
++*/
+ 	pinctrl_pwm2: pwm2grp {
+ 		fsl,pins = <
+ 			MX8MP_IOMUXC_GPIO1_IO11__PWM2_OUT	0x116
+ 		>;
+ 	};
+-
++/*
+ 	pinctrl_pwm4: pwm4grp {
+ 		fsl,pins = <
+ 			MX8MP_IOMUXC_SAI5_RXFS__PWM4_OUT	0x116
+ 		>;
+ 	};
++*/
++	pinctrl_lvds0_pwr: lvds0_pwr {
++		fsl,pins = <
++			MX8MP_IOMUXC_GPIO1_IO09__GPIO1_IO09		0x16
++		>;
++	};
++
++	pinctrl_lvds0_backlight_pwr: lvds0_backlight_pwr {
++		fsl,pins = <
++			MX8MP_IOMUXC_GPIO1_IO10__GPIO1_IO10	0x16
++		>;
++	};
++
++	pinctrl_ecspi1: ecspi1grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_ECSPI1_SCLK__ECSPI1_SCLK		0x00001916
++			MX8MP_IOMUXC_ECSPI1_MOSI__ECSPI1_MOSI		0x00000116
++			MX8MP_IOMUXC_ECSPI1_MISO__ECSPI1_MISO		0x00000116
++		>;
++	};
+ 
+ 	pinctrl_ecspi2: ecspi2grp {
+ 		fsl,pins = <
+-			MX8MP_IOMUXC_ECSPI2_SCLK__ECSPI2_SCLK		0x82
+-			MX8MP_IOMUXC_ECSPI2_MOSI__ECSPI2_MOSI		0x82
+-			MX8MP_IOMUXC_ECSPI2_MISO__ECSPI2_MISO		0x82
++			MX8MP_IOMUXC_ECSPI2_SCLK__ECSPI2_SCLK		0x00001916
++			MX8MP_IOMUXC_ECSPI2_MOSI__ECSPI2_MOSI		0x00000116
++			MX8MP_IOMUXC_ECSPI2_MISO__ECSPI2_MISO		0x00000116
++			MX8MP_IOMUXC_GPIO1_IO15__GPIO1_IO15 		0x00000146    //TPM_RST PULL HIGH
++		>;
++	};
++
++	pinctrl_ecspi1_cs: ecspi1cs {
++		fsl,pins = <
++			MX8MP_IOMUXC_ECSPI1_SS0__GPIO5_IO09		0x00000116
+ 		>;
+ 	};
+ 
+ 	pinctrl_ecspi2_cs: ecspi2cs {
+ 		fsl,pins = <
+-			MX8MP_IOMUXC_ECSPI2_SS0__GPIO5_IO13		0x40000
++			MX8MP_IOMUXC_ECSPI2_SS0__GPIO5_IO13		0x00000116
+ 		>;
+ 	};
+ 
+@@ -1001,9 +1200,10 @@ MX8MP_IOMUXC_SAI1_TXD3__ENET1_RGMII_TD3		0x16
+ 			MX8MP_IOMUXC_SAI1_TXD4__ENET1_RGMII_TX_CTL	0x16
+ 			MX8MP_IOMUXC_SAI1_TXD5__ENET1_RGMII_TXC		0x16
+ 			MX8MP_IOMUXC_SAI1_RXD0__GPIO4_IO02		0x10
++			MX8MP_IOMUXC_SAI1_TXD6__GPIO4_IO18		0x1c4
+ 		>;
+ 	};
+-
++/*
+ 	pinctrl_flexcan1: flexcan1grp {
+ 		fsl,pins = <
+ 			MX8MP_IOMUXC_SPDIF_RX__CAN1_RX          0x154
+@@ -1017,6 +1217,7 @@ MX8MP_IOMUXC_SAI5_MCLK__CAN2_RX         0x154
+ 			MX8MP_IOMUXC_SAI5_RXD3__CAN2_TX         0x154
+ 		>;
+ 	};
++*/
+ 
+ 	pinctrl_flexcan1_reg: flexcan1reggrp {
+ 		fsl,pins = <
+@@ -1032,12 +1233,13 @@ MX8MP_IOMUXC_SAI2_MCLK__GPIO4_IO27      0x154   /* CAN2_STBY */
+ 
+ 	pinctrl_flexspi0: flexspi0grp {
+ 		fsl,pins = <
+-			MX8MP_IOMUXC_NAND_ALE__FLEXSPI_A_SCLK           0x1c2
+-			MX8MP_IOMUXC_NAND_CE0_B__FLEXSPI_A_SS0_B        0x82
+-			MX8MP_IOMUXC_NAND_DATA00__FLEXSPI_A_DATA00      0x82
+-			MX8MP_IOMUXC_NAND_DATA01__FLEXSPI_A_DATA01      0x82
+-			MX8MP_IOMUXC_NAND_DATA02__FLEXSPI_A_DATA02      0x82
+-			MX8MP_IOMUXC_NAND_DATA03__FLEXSPI_A_DATA03      0x82
++			//MX8MP_IOMUXC_NAND_ALE__FLEXSPI_A_SCLK           0x1c2
++			//MX8MP_IOMUXC_NAND_CE0_B__FLEXSPI_A_SS0_B        0x82
++			//MX8MP_IOMUXC_NAND_DATA00__FLEXSPI_A_DATA00      0x82
++			  MX8MP_IOMUXC_NAND_DATA00__GPIO3_IO06       0x00000140
++			//MX8MP_IOMUXC_NAND_DATA01__FLEXSPI_A_DATA01      0x82
++			//MX8MP_IOMUXC_NAND_DATA02__FLEXSPI_A_DATA02      0x82
++			//MX8MP_IOMUXC_NAND_DATA03__FLEXSPI_A_DATA03      0x82
+ 		>;
+ 	};
+ 
+@@ -1068,18 +1270,36 @@ MX8MP_IOMUXC_I2C3_SDA__I2C3_SDA		0x400001c2
+ 		>;
+ 	};
+ 
++	pinctrl_i2c5: i2c5grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_SAI5_MCLK__I2C5_SDA         0x400001c2
++			MX8MP_IOMUXC_SAI5_RXD0__I2C5_SCL         0x400001c2
++		>;
++	};
++/*
+ 	pinctrl_mipi_dsi_en: mipi_dsi_en {
+ 		fsl,pins = <
+ 			MX8MP_IOMUXC_GPIO1_IO08__GPIO1_IO08	0x16
+ 		>;
+ 	};
+-
++*/
+ 	pinctrl_pcie: pciegrp {
+ 		fsl,pins = <
+ 			MX8MP_IOMUXC_I2C4_SCL__PCIE_CLKREQ_B		0x60 /* open drain, pull up */
+-			MX8MP_IOMUXC_SD1_DATA4__GPIO2_IO06		0x40
+-			MX8MP_IOMUXC_SD1_DATA5__GPIO2_IO07		0x40
+-			MX8MP_IOMUXC_I2C4_SDA__GPIO5_IO21		0x1c4
++			MX8MP_IOMUXC_SAI1_TXD7__GPIO4_IO19         0x106 //0x146 //pcie reset
++			MX8MP_IOMUXC_SD1_CLK__GPIO2_IO00	0x00000106 // WIFI power
++		>;
++	};
++
++	pinctrl_pcie0_reg: pcie0reggrp {
++		fsl,pins = <
++			MX8MP_IOMUXC_I2C4_SDA__GPIO5_IO21	0x1c4  ///PCIe_nWAKE_3V3
++		>;
++	};
++
++	pinctrl_tlv320: tlv320grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_SD1_DATA7__GPIO2_IO09         0x00000106  //Audio reset
+ 		>;
+ 	};
+ 
+@@ -1097,20 +1317,21 @@ MX8MP_IOMUXC_SD2_RESET_B__GPIO2_IO19	0x40
+ 
+ 	pinctrl_pdm: pdmgrp {
+ 		fsl,pins = <
+-			MX8MP_IOMUXC_SAI5_RXC__AUDIOMIX_PDM_CLK		0xd6
+-			MX8MP_IOMUXC_SAI5_RXD0__AUDIOMIX_PDM_BIT_STREAM00	0xd6
+-			MX8MP_IOMUXC_SAI5_RXD1__AUDIOMIX_PDM_BIT_STREAM01	0xd6
+-			MX8MP_IOMUXC_SAI5_RXD2__AUDIOMIX_PDM_BIT_STREAM02	0xd6
+-			MX8MP_IOMUXC_SAI5_RXD3__AUDIOMIX_PDM_BIT_STREAM03	0xd6
++			MX8MP_IOMUXC_SAI5_RXFS__GPIO3_IO19					0x16
++			MX8MP_IOMUXC_SAI5_RXC__GPIO3_IO20					0x16
++			MX8MP_IOMUXC_SAI5_RXD0__GPIO3_IO21		            0x16
++			MX8MP_IOMUXC_SAI5_RXD1__GPIO3_IO22                  0x16
++			MX8MP_IOMUXC_SAI5_RXD2__GPIO3_IO23					0x16
++			//MX8MP_IOMUXC_SAI5_RXD3__AUDIOMIX_PDM_BIT_STREAM03	0xd6
+ 		>;
+ 	};
+ 
+ 	pinctrl_sai2: sai2grp {
+ 		fsl,pins = <
+-			MX8MP_IOMUXC_SAI2_TXC__AUDIOMIX_SAI2_TX_BCLK	0xd6
+-			MX8MP_IOMUXC_SAI2_TXFS__AUDIOMIX_SAI2_TX_SYNC	0xd6
+-			MX8MP_IOMUXC_SAI2_TXD0__AUDIOMIX_SAI2_TX_DATA00	0xd6
+-			MX8MP_IOMUXC_SAI2_RXD0__AUDIOMIX_SAI2_RX_DATA00	0xd6
++			MX8MP_IOMUXC_SAI2_TXC__GPIO4_IO25	0xd5
++			MX8MP_IOMUXC_SAI2_TXFS__GPIO4_IO24	0xd5
++			MX8MP_IOMUXC_SAI2_TXD0__GPIO4_IO26	0x00000146
++			MX8MP_IOMUXC_SAI2_RXD0__GPIO4_IO23	0xd5
+ 		>;
+ 	};
+ 
+@@ -1118,17 +1339,17 @@ pinctrl_sai3: sai3grp {
+ 		fsl,pins = <
+ 			MX8MP_IOMUXC_SAI3_TXFS__AUDIOMIX_SAI3_TX_SYNC	0xd6
+ 			MX8MP_IOMUXC_SAI3_TXC__AUDIOMIX_SAI3_TX_BCLK	0xd6
+-			MX8MP_IOMUXC_SAI3_RXD__AUDIOMIX_SAI3_RX_DATA00	0xd6
++			MX8MP_IOMUXC_SAI3_RXD__AUDIOMIX_SAI3_RX_DATA00	0xd6	
++			MX8MP_IOMUXC_SAI3_RXFS__AUDIOMIX_SAI3_RX_SYNC	0xd6
++			MX8MP_IOMUXC_SAI3_RXC__AUDIOMIX_SAI3_RX_BCLK	0xd6
+ 			MX8MP_IOMUXC_SAI3_TXD__AUDIOMIX_SAI3_TX_DATA00	0xd6
+ 			MX8MP_IOMUXC_SAI3_MCLK__AUDIOMIX_SAI3_MCLK	0xd6
+-			MX8MP_IOMUXC_SAI3_RXFS__GPIO4_IO28		0xd6
+-			MX8MP_IOMUXC_SAI3_RXC__GPIO4_IO29		0xd6
+ 		>;
+ 	};
+ 
+ 	pinctrl_i2c2_synaptics_dsx_io: synaptics_dsx_iogrp {
+ 		fsl,pins = <
+-			MX8MP_IOMUXC_GPIO1_IO09__GPIO1_IO09		0x16
++			//MX8MP_IOMUXC_GPIO1_IO09__GPIO1_IO09		0x16
+ 		>;
+ 	};
+ 
+@@ -1143,20 +1364,17 @@ MX8MP_IOMUXC_UART3_TXD__UART1_DCE_RTS	0x140
+ 
+ 	pinctrl_typec: typec1grp {
+ 		fsl,pins = <
+-			MX8MP_IOMUXC_SAI1_TXD7__GPIO4_IO19	0x1c4
++			//MX8MP_IOMUXC_SAI1_TXD7__GPIO4_IO19	0x1c4
+ 		>;
+ 	};
+ 
+-	pinctrl_typec_mux: typec1muxgrp {
+-		fsl,pins = <
+-			MX8MP_IOMUXC_SAI1_MCLK__GPIO4_IO20	0x16
+-		>;
+-	};
+ 
+ 	pinctrl_uart2: uart2grp {
+ 		fsl,pins = <
+-			MX8MP_IOMUXC_UART2_RXD__UART2_DCE_RX	0x140
+-			MX8MP_IOMUXC_UART2_TXD__UART2_DCE_TX	0x140
++				MX8MP_IOMUXC_SD1_DATA2__UART2_DCE_TX       0x140
++                MX8MP_IOMUXC_SD1_DATA3__UART2_DCE_RX       0x140
++                MX8MP_IOMUXC_SD1_DATA4__UART2_DCE_RTS      0x140
++                MX8MP_IOMUXC_SD1_DATA5__UART2_DCE_CTS      0x140
+ 		>;
+ 	};
+ 
+@@ -1165,7 +1383,7 @@ pinctrl_usb1_vbus: usb1grp {
+ 			MX8MP_IOMUXC_GPIO1_IO14__USB2_PWR		0x10
+ 		>;
+ 	};
+-
++/*
+ 	pinctrl_uart3: uart3grp {
+ 		fsl,pins = <
+ 			MX8MP_IOMUXC_ECSPI1_SCLK__UART3_DCE_RX		0x140
+@@ -1174,6 +1392,13 @@ MX8MP_IOMUXC_ECSPI1_SS0__UART3_DCE_RTS		0x140
+ 			MX8MP_IOMUXC_ECSPI1_MISO__UART3_DCE_CTS		0x140
+ 		>;
+ 	};
++*/
++	pinctrl_uart4: uart4grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_UART4_RXD__UART4_DCE_RX			0x140
++			MX8MP_IOMUXC_UART4_TXD__UART4_DCE_TX			0x140
++		>;
++	};
+ 
+ 	pinctrl_usdhc2: usdhc2grp {
+ 		fsl,pins = <
+@@ -1271,6 +1496,18 @@ MX8MP_IOMUXC_GPIO1_IO02__WDOG1_WDOG_B	0x166
+ 		>;
+ 	};
+ 
++	pinctrl_reg_usb1_vbus: usb1_vbus_grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_GPIO1_IO05__GPIO1_IO05	0x59
++		>;
++	};
++
++	pinctrl_reg_usb2_vbus: usb2_vbus_grp {
++		fsl,pins = <
++			MX8MP_IOMUXC_GPIO1_IO06__GPIO1_IO06	0x59
++		>;
++	};
++
+ 	pinctrl_csi0_pwn: csi0_pwn_grp {
+ 		fsl,pins = <
+ 			MX8MP_IOMUXC_SD1_STROBE__GPIO2_IO11	0x10
+@@ -1279,13 +1516,13 @@ MX8MP_IOMUXC_SD1_STROBE__GPIO2_IO11	0x10
+ 
+ 	pinctrl_csi0_rst: csi0_rst_grp {
+ 		fsl,pins = <
+-			MX8MP_IOMUXC_GPIO1_IO06__GPIO1_IO06		0x10
++			//MX8MP_IOMUXC_GPIO1_IO06__GPIO1_IO06		0x10
+ 		>;
+ 	};
+ 
+ 	pinctrl_csi_mclk: csi_mclk_grp {
+ 		fsl,pins = <
+-			MX8MP_IOMUXC_GPIO1_IO15__CCM_CLKO2	0x50
++			//MX8MP_IOMUXC_GPIO1_IO15__CCM_CLKO2	0x50
+ 		>;
+ 	};
+ };
+diff --git a/arch/arm64/boot/dts/freescale/imx8mp.dtsi b/arch/arm64/boot/dts/freescale/imx8mp.dtsi
+index 7e71a112c618..ef0df790311d 100644
+--- a/arch/arm64/boot/dts/freescale/imx8mp.dtsi
++++ b/arch/arm64/boot/dts/freescale/imx8mp.dtsi
+@@ -18,6 +18,8 @@ / {
+ 	#size-cells = <2>;
+ 
+ 	aliases {
++		rtc0 = &pcf85063;
++		rtc1 = &snvs_rtc;
+ 		ethernet0 = &fec;
+ 		ethernet1 = &eqos;
+ 		gpio0 = &gpio1;
+@@ -859,7 +861,7 @@ pwm2: pwm@30670000 {
+ 				clocks = <&clk IMX8MP_CLK_PWM2_ROOT>,
+ 					 <&clk IMX8MP_CLK_PWM2_ROOT>;
+ 				clock-names = "ipg", "per";
+-				#pwm-cells = <2>;
++				#pwm-cells = <3>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -1075,6 +1077,11 @@ i2c3: i2c@30a40000 {
+ 				interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&clk IMX8MP_CLK_I2C3_ROOT>;
+ 				status = "disabled";
++				pcf85063: pcf85063@51 {
++					compatible = "nxp,pcf85063";
++					reg = <0x51>;
++					status = "okay";
++				};
+ 			};
+ 
+ 			i2c4: i2c@30a50000 {
+diff --git a/drivers/net/usb/Makefile b/drivers/net/usb/Makefile
+index 4964f7b326fb..babf9b669cf5 100644
+--- a/drivers/net/usb/Makefile
++++ b/drivers/net/usb/Makefile
+@@ -37,6 +37,7 @@ obj-$(CONFIG_USB_NET_CX82310_ETH)	+= cx82310_eth.o
+ obj-$(CONFIG_USB_NET_CDC_NCM)	+= cdc_ncm.o
+ obj-$(CONFIG_USB_NET_HUAWEI_CDC_NCM)	+= huawei_cdc_ncm.o
+ obj-$(CONFIG_USB_VL600)		+= lg-vl600.o
++obj-${CONFIG_USB_NET_QMI_WWAN} += qmi_wwan_q.o
+ obj-$(CONFIG_USB_NET_QMI_WWAN)	+= qmi_wwan.o
+ obj-$(CONFIG_USB_NET_CDC_MBIM)	+= cdc_mbim.o
+ obj-$(CONFIG_USB_NET_CH9200)	+= ch9200.o
+diff --git a/drivers/net/usb/qmi_wwan.c b/drivers/net/usb/qmi_wwan.c
+index 15c90441285c..4de16556ada4 100644
+--- a/drivers/net/usb/qmi_wwan.c
++++ b/drivers/net/usb/qmi_wwan.c
+@@ -835,8 +835,11 @@ static int qmi_wwan_bind(struct usbnet *dev, struct usb_interface *intf)
+ 
+ 	/* make MAC addr easily distinguishable from an IP header */
+ 	if (possibly_iphdr(dev->net->dev_addr)) {
+-		dev->net->dev_addr[0] |= 0x02;	/* set local assignment bit */
+-		dev->net->dev_addr[0] &= 0xbf;	/* clear "IP" bit */
++		u8 addr = dev->net->dev_addr[0];
++
++		addr |= 0x02;	/* set local assignment bit */
++		addr &= 0xbf;	/* clear "IP" bit */
++		dev_addr_mod(dev->net, 0, &addr, 1);
+ 	}
+ 	dev->net->netdev_ops = &qmi_wwan_netdev_ops;
+ 	dev->net->sysfs_groups[0] = &qmi_wwan_sysfs_attr_group;
+@@ -1088,6 +1091,7 @@ static const struct usb_device_id products[] = {
+ 	{QMI_MATCH_FF_FF_FF(0x2c7c, 0x0801)},	/* Quectel RM520N */
+ 
+ 	/* 3. Combined interface devices matching on interface number */
++	{QMI_QUIRK_SET_DTR(0x05c6, 0x9091, 2)}, /* CEI SDX55 */
+ 	{QMI_FIXED_INTF(0x0408, 0xea42, 4)},	/* Yota / Megafon M100-1 */
+ 	{QMI_FIXED_INTF(0x05c6, 0x6001, 3)},	/* 4G LTE usb-modem U901 */
+ 	{QMI_FIXED_INTF(0x05c6, 0x7000, 0)},
+@@ -1314,6 +1318,7 @@ static const struct usb_device_id products[] = {
+ 	{QMI_FIXED_INTF(0x19d2, 0x1426, 2)},	/* ZTE MF91 */
+ 	{QMI_FIXED_INTF(0x19d2, 0x1428, 2)},	/* Telewell TW-LTE 4G v2 */
+ 	{QMI_FIXED_INTF(0x19d2, 0x1432, 3)},	/* ZTE ME3620 */
++	{QMI_FIXED_INTF(0x19d2, 0x1485, 5)},	/* ZTE MF286D */
+ 	{QMI_FIXED_INTF(0x19d2, 0x2002, 4)},	/* ZTE (Vodafone) K3765-Z */
+ 	{QMI_FIXED_INTF(0x2001, 0x7e16, 3)},	/* D-Link DWM-221 */
+ 	{QMI_FIXED_INTF(0x2001, 0x7e19, 4)},	/* D-Link DWM-221 B1 */
+@@ -1348,13 +1353,16 @@ static const struct usb_device_id products[] = {
+ 	{QMI_QUIRK_SET_DTR(0x1199, 0x907b, 8)},	/* Sierra Wireless EM74xx */
+ 	{QMI_QUIRK_SET_DTR(0x1199, 0x907b, 10)},/* Sierra Wireless EM74xx */
+ 	{QMI_QUIRK_SET_DTR(0x1199, 0x9091, 8)},	/* Sierra Wireless EM7565 */
++	{QMI_QUIRK_SET_DTR(0x1199, 0xc081, 8)},	/* Sierra Wireless EM7590 */
+ 	{QMI_FIXED_INTF(0x1bbb, 0x011e, 4)},	/* Telekom Speedstick LTE II (Alcatel One Touch L100V LTE) */
+ 	{QMI_FIXED_INTF(0x1bbb, 0x0203, 2)},	/* Alcatel L800MA */
+ 	{QMI_FIXED_INTF(0x2357, 0x0201, 4)},	/* TP-LINK HSUPA Modem MA180 */
+ 	{QMI_FIXED_INTF(0x2357, 0x9000, 4)},	/* TP-LINK MA260 */
+ 	{QMI_QUIRK_SET_DTR(0x1bc7, 0x1031, 3)}, /* Telit LE910C1-EUX */
++	{QMI_QUIRK_SET_DTR(0x1bc7, 0x103a, 0)}, /* Telit LE910C4-WWX */
+ 	{QMI_QUIRK_SET_DTR(0x1bc7, 0x1040, 2)},	/* Telit LE922A */
+ 	{QMI_QUIRK_SET_DTR(0x1bc7, 0x1050, 2)},	/* Telit FN980 */
++	{QMI_QUIRK_SET_DTR(0x1bc7, 0x1057, 2)},	/* Telit FN980 */
+ 	{QMI_QUIRK_SET_DTR(0x1bc7, 0x1060, 2)},	/* Telit LN920 */
+ 	{QMI_QUIRK_SET_DTR(0x1bc7, 0x1070, 2)},	/* Telit FN990 */
+ 	{QMI_FIXED_INTF(0x1bc7, 0x1100, 3)},	/* Telit ME910 */
+@@ -1362,6 +1370,7 @@ static const struct usb_device_id products[] = {
+ 	{QMI_FIXED_INTF(0x1bc7, 0x1200, 5)},	/* Telit LE920 */
+ 	{QMI_QUIRK_SET_DTR(0x1bc7, 0x1201, 2)},	/* Telit LE920, LE920A4 */
+ 	{QMI_QUIRK_SET_DTR(0x1bc7, 0x1230, 2)},	/* Telit LE910Cx */
++	{QMI_QUIRK_SET_DTR(0x1bc7, 0x1250, 0)},	/* Telit LE910Cx */
+ 	{QMI_QUIRK_SET_DTR(0x1bc7, 0x1260, 2)},	/* Telit LE910Cx */
+ 	{QMI_QUIRK_SET_DTR(0x1bc7, 0x1261, 2)},	/* Telit LE910Cx */
+ 	{QMI_QUIRK_SET_DTR(0x1bc7, 0x1900, 1)},	/* Telit LN940 series */
+@@ -1384,6 +1393,9 @@ static const struct usb_device_id products[] = {
+ 	{QMI_FIXED_INTF(0x1e2d, 0x0083, 4)},	/* Cinterion PHxx,PXxx (1 RmNet + USB Audio)*/
+ 	{QMI_QUIRK_SET_DTR(0x1e2d, 0x00b0, 4)},	/* Cinterion CLS8 */
+ 	{QMI_FIXED_INTF(0x1e2d, 0x00b7, 0)},	/* Cinterion MV31 RmNet */
++	{QMI_FIXED_INTF(0x1e2d, 0x00b9, 0)},	/* Cinterion MV31 RmNet based on new baseline */
++	{QMI_FIXED_INTF(0x1e2d, 0x00f3, 0)},	/* Cinterion MV32-W-A RmNet */
++	{QMI_FIXED_INTF(0x1e2d, 0x00f4, 0)},	/* Cinterion MV32-W-B RmNet */
+ 	{QMI_FIXED_INTF(0x413c, 0x81a2, 8)},	/* Dell Wireless 5806 Gobi(TM) 4G LTE Mobile Broadband Card */
+ 	{QMI_FIXED_INTF(0x413c, 0x81a3, 8)},	/* Dell Wireless 5570 HSPA+ (42Mbps) Mobile Broadband Card */
+ 	{QMI_FIXED_INTF(0x413c, 0x81a4, 8)},	/* Dell Wireless 5570e HSPA+ (42Mbps) Mobile Broadband Card */
+@@ -1393,6 +1405,7 @@ static const struct usb_device_id products[] = {
+ 	{QMI_FIXED_INTF(0x413c, 0x81b3, 8)},	/* Dell Wireless 5809e Gobi(TM) 4G LTE Mobile Broadband Card (rev3) */
+ 	{QMI_FIXED_INTF(0x413c, 0x81b6, 8)},	/* Dell Wireless 5811e */
+ 	{QMI_FIXED_INTF(0x413c, 0x81b6, 10)},	/* Dell Wireless 5811e */
++	{QMI_FIXED_INTF(0x413c, 0x81c2, 8)},	/* Dell Wireless 5811e */
+ 	{QMI_FIXED_INTF(0x413c, 0x81cc, 8)},	/* Dell Wireless 5816e */
+ 	{QMI_FIXED_INTF(0x413c, 0x81d7, 0)},	/* Dell Wireless 5821e */
+ 	{QMI_FIXED_INTF(0x413c, 0x81d7, 1)},	/* Dell Wireless 5821e preproduction config */
+@@ -1401,6 +1414,7 @@ static const struct usb_device_id products[] = {
+ 	{QMI_FIXED_INTF(0x413c, 0x81e6, 0)},	/* Dell Wireless 5829e */
+ 	{QMI_FIXED_INTF(0x03f0, 0x4e1d, 8)},	/* HP lt4111 LTE/EV-DO/HSPA+ Gobi 4G Module */
+ 	{QMI_FIXED_INTF(0x03f0, 0x9d1d, 1)},	/* HP lt4120 Snapdragon X5 LTE */
++	{QMI_QUIRK_SET_DTR(0x22de, 0x9051, 2)}, /* Hucom Wireless HM-211S/K */
+ 	{QMI_FIXED_INTF(0x22de, 0x9061, 3)},	/* WeTelecom WPD-600N */
+ 	{QMI_QUIRK_SET_DTR(0x1e0e, 0x9001, 5)},	/* SIMCom 7100E, 7230E, 7600E ++ */
+ 	{QMI_QUIRK_SET_DTR(0x2c7c, 0x0121, 4)},	/* Quectel EC21 Mini PCIe */
+@@ -1411,6 +1425,7 @@ static const struct usb_device_id products[] = {
+ 	{QMI_FIXED_INTF(0x0489, 0xe0b4, 0)},	/* Foxconn T77W968 LTE */
+ 	{QMI_FIXED_INTF(0x0489, 0xe0b5, 0)},	/* Foxconn T77W968 LTE with eSIM support*/
+ 	{QMI_FIXED_INTF(0x2692, 0x9025, 4)},    /* Cellient MPL200 (rebranded Qualcomm 05c6:9025) */
++	{QMI_QUIRK_SET_DTR(0x1546, 0x1342, 4)},	/* u-blox LARA-L6 */
+ 
+ 	/* 4. Gobi 1000 devices */
+ 	{QMI_GOBI1K_DEVICE(0x05c6, 0x9212)},	/* Acer Gobi Modem Device */
+diff --git a/drivers/net/usb/qmi_wwan_q.c b/drivers/net/usb/qmi_wwan_q.c
+new file mode 100644
+index 000000000000..13258c9f0a49
+--- /dev/null
++++ b/drivers/net/usb/qmi_wwan_q.c
+@@ -0,0 +1,2682 @@
++/*
++ * Copyright (c) 2012  Bjørn Mork <bjorn@mork.no>
++ *
++ * The probing code is heavily inspired by cdc_ether, which is:
++ * Copyright (C) 2003-2005 by David Brownell
++ * Copyright (C) 2006 by Ole Andre Vadla Ravnas (ActiveSync)
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * version 2 as published by the Free Software Foundation.
++ */
++
++#include <linux/module.h>
++#include <linux/version.h>
++#include <linux/interrupt.h>
++#include <linux/netdevice.h>
++#include <linux/ethtool.h>
++#include <linux/etherdevice.h>
++#include <linux/time.h>
++#if LINUX_VERSION_CODE > KERNEL_VERSION(3,16,0) //8b094cd03b4a3793220d8d8d86a173bfea8c285b
++#include <linux/timekeeping.h>
++#else
++#define timespec64  timespec
++#define ktime_get_ts64 ktime_get_ts
++#define timespec64_sub timespec_sub
++#endif
++#include <net/arp.h>
++#include <net/ip.h>
++#include <net/ipv6.h>
++#include <linux/mii.h>
++#include <linux/usb.h>
++#include <linux/usb/cdc.h>
++#include <linux/usb/usbnet.h>
++#include <linux/usb/cdc-wdm.h>
++
++#ifndef ETH_P_MAP
++#define ETH_P_MAP 0xDA1A
++#endif
++
++#if (ETH_P_MAP == 0x00F9)
++#undef ETH_P_MAP
++#define ETH_P_MAP 0xDA1A
++#endif
++
++#ifndef ARPHRD_RAWIP
++#define ARPHRD_RAWIP ARPHRD_NONE
++#endif
++
++#ifdef CONFIG_PINCTRL_IPQ807x
++#define CONFIG_QCA_NSS_DRV
++//#define CONFIG_QCA_NSS_PACKET_FILTER
++#endif
++
++#define _RMNET_NSS_H_
++#define _RMENT_NSS_H_
++struct rmnet_nss_cb {
++        int (*nss_create)(struct net_device *dev);
++        int (*nss_free)(struct net_device *dev);
++        int (*nss_tx)(struct sk_buff *skb);
++};
++static struct rmnet_nss_cb __read_mostly *nss_cb = NULL;
++#if defined(CONFIG_PINCTRL_IPQ807x) || defined(CONFIG_PINCTRL_IPQ5018) || defined(CONFIG_PINCTRL_IPQ8074)
++//#ifdef CONFIG_RMNET_DATA //spf12.x none, not effect for spf11.x
++#define CONFIG_QCA_NSS_DRV
++/* define at qsdk/qca/src/linux-4.4/net/rmnet_data/rmnet_data_main.c */ //for spf11.x
++/* define at qsdk/qca/src/datarmnet/core/rmnet_config.c */ //for spf12.x
++/* set at qsdk/qca/src/data-kernel/drivers/rmnet-nss/rmnet_nss.c */
++/* need add DEPENDS:= kmod-rmnet-core in feeds/makefile */
++extern struct rmnet_nss_cb *rmnet_nss_callbacks __rcu __read_mostly;
++//#endif
++#endif
++
++/* This driver supports wwan (3G/LTE/?) devices using a vendor
++ * specific management protocol called Qualcomm MSM Interface (QMI) -
++ * in addition to the more common AT commands over serial interface
++ * management
++ *
++ * QMI is wrapped in CDC, using CDC encapsulated commands on the
++ * control ("master") interface of a two-interface CDC Union
++ * resembling standard CDC ECM.  The devices do not use the control
++ * interface for any other CDC messages.  Most likely because the
++ * management protocol is used in place of the standard CDC
++ * notifications NOTIFY_NETWORK_CONNECTION and NOTIFY_SPEED_CHANGE
++ *
++ * Alternatively, control and data functions can be combined in a
++ * single USB interface.
++ *
++ * Handling a protocol like QMI is out of the scope for any driver.
++ * It is exported as a character device using the cdc-wdm driver as
++ * a subdriver, enabling userspace applications ("modem managers") to
++ * handle it.
++ *
++ * These devices may alternatively/additionally be configured using AT
++ * commands on a serial interface
++ */
++#define VERSION_NUMBER "V1.2.6"
++#define QUECTEL_WWAN_VERSION "Quectel_Linux&Android_QMI_WWAN_Driver_"VERSION_NUMBER
++static const char driver_name[] = "qmi_wwan_q";
++
++/* driver specific data */
++struct qmi_wwan_state {
++	struct usb_driver *subdriver;
++	atomic_t pmcount;
++	unsigned long unused;
++	struct usb_interface *control;
++	struct usb_interface *data;
++};
++
++/* default ethernet address used by the modem */
++static const u8 default_modem_addr[ETH_ALEN] = {0x02, 0x50, 0xf3};
++
++#if 1 //Added by Quectel
++/*
++    Quectel_WCDMA&LTE_Linux_USB_Driver_User_Guide_V1.9.pdf
++    5.6.	Test QMAP on GobiNet or QMI WWAN
++    0 - no QMAP
++    1 - QMAP (Aggregation protocol)
++    X - QMAP (Multiplexing and Aggregation protocol)
++*/
++//#define CONFIG_CLEAR_HALT
++#define QUECTEL_WWAN_QMAP 4 //MAX is 7
++
++#if defined(QUECTEL_WWAN_QMAP)
++#define QUECTEL_QMAP_MUX_ID 0x81
++
++static uint __read_mostly qmap_mode = 0;
++module_param( qmap_mode, uint, S_IRUGO);
++module_param_named( rx_qmap, qmap_mode, uint, S_IRUGO );
++#endif
++
++#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE) || defined(CONFIG_BRIDGE_LAN)
++#define QUECTEL_BRIDGE_MODE
++#endif
++
++#ifdef QUECTEL_BRIDGE_MODE
++static uint __read_mostly bridge_mode = 0/*|BIT(1)*/;
++module_param( bridge_mode, uint, S_IRUGO );
++#endif
++
++#ifdef CONFIG_BRIDGE_LAN
++static const u8 broadcast_mac_addr[ETH_ALEN] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
++#endif
++
++//#define QMI_NETDEV_ONE_CARD_MODE
++static uint __read_mostly one_card_mode = 0;
++
++#if defined(QUECTEL_WWAN_QMAP)
++#define QUECTEL_UL_DATA_AGG 1
++
++#if defined(QUECTEL_UL_DATA_AGG)
++struct tx_agg_ctx {
++	/* QMIWDS_ADMIN_SET_DATA_FORMAT_RESP TLV_0x17 and TLV_0x18 */
++	uint ul_data_aggregation_max_datagrams; //UplinkDataAggregationMaxDatagramsTlv
++	uint ul_data_aggregation_max_size; //UplinkDataAggregationMaxSizeTlv
++	uint dl_minimum_padding; //0x1A
++};
++#endif
++
++typedef struct {
++    unsigned int size;
++    unsigned int rx_urb_size;
++    unsigned int ep_type;
++    unsigned int iface_id;
++    unsigned int qmap_mode;
++    unsigned int qmap_version;
++    unsigned int dl_minimum_padding;
++    char ifname[8][16];
++    unsigned char mux_id[8];
++} RMNET_INFO;
++
++typedef struct sQmiWwanQmap
++{
++	struct usbnet *mpNetDev;
++	struct driver_info driver_info;
++	atomic_t refcount;
++	struct net_device *mpQmapNetDev[QUECTEL_WWAN_QMAP];
++	uint link_state;
++	uint qmap_mode;
++	uint qmap_size;
++	uint qmap_version;
++
++#if defined(QUECTEL_UL_DATA_AGG)
++	struct tx_agg_ctx tx_ctx;
++	struct tasklet_struct	txq;
++	struct tasklet_struct usbnet_bh;
++#endif
++
++#ifdef QUECTEL_BRIDGE_MODE
++	uint bridge_mode;
++	uint bridge_ipv4;
++	unsigned char bridge_mac[ETH_ALEN];
++#ifdef CONFIG_BRIDGE_LAN
++    unsigned char bridge_self_mac[ETH_ALEN];
++#endif
++#endif
++	uint use_rmnet_usb;
++	RMNET_INFO rmnet_info;
++} sQmiWwanQmap;
++
++#if LINUX_VERSION_CODE > KERNEL_VERSION(3,13,0) //8f84985fec10de64a6b4cdfea45f2b0ab8f07c78
++#define MHI_NETDEV_STATUS64
++#endif
++struct qmap_priv {
++	struct usbnet *dev;
++	struct net_device *real_dev;
++	struct net_device *self_dev;
++	u8 offset_id;
++	u8 mux_id;
++	u8 qmap_version; // 5~v1, 9~v5
++	u8 link_state;
++
++#if defined(MHI_NETDEV_STATUS64)
++	struct pcpu_sw_netstats __percpu *stats64;
++#endif
++
++	spinlock_t agg_lock;
++	struct sk_buff *agg_skb;
++	unsigned agg_count;
++	struct timespec64 agg_time;
++	struct hrtimer agg_hrtimer;
++	struct work_struct agg_wq;
++
++#ifdef QUECTEL_BRIDGE_MODE
++	uint bridge_mode;
++	uint bridge_ipv4;
++	unsigned char bridge_mac[ETH_ALEN];
++#ifdef CONFIG_BRIDGE_LAN
++    unsigned char bridge_self_mac[ETH_ALEN];
++#endif
++#endif
++	uint use_qca_nss;
++};
++
++struct qmap_hdr {
++    u8 cd_rsvd_pad;
++    u8 mux_id;
++    u16 pkt_len;
++} __packed;
++
++enum rmnet_map_v5_header_type {
++	RMNET_MAP_HEADER_TYPE_UNKNOWN,
++	RMNET_MAP_HEADER_TYPE_COALESCING = 0x1,
++	RMNET_MAP_HEADER_TYPE_CSUM_OFFLOAD = 0x2,
++	RMNET_MAP_HEADER_TYPE_ENUM_LENGTH
++};
++
++/* Main QMAP header */
++struct rmnet_map_header {
++#if defined(__LITTLE_ENDIAN_BITFIELD)
++	u8  pad_len:6;
++	u8  next_hdr:1;
++	u8  cd_bit:1;
++#elif defined (__BIG_ENDIAN_BITFIELD)
++	u8  cd_bit:1;
++	u8  next_hdr:1;
++	u8  pad_len:6;
++#else
++#error	"Please fix <asm/byteorder.h>"
++#endif
++	u8  mux_id;
++	__be16 pkt_len;
++}  __aligned(1);
++
++/* QMAP v5 headers */
++struct rmnet_map_v5_csum_header {
++#if defined(__LITTLE_ENDIAN_BITFIELD)
++	u8  next_hdr:1;
++	u8  header_type:7;
++	u8  hw_reserved:7;
++	u8  csum_valid_required:1;
++#elif defined (__BIG_ENDIAN_BITFIELD)
++	u8  header_type:7;
++	u8  next_hdr:1;
++	u8  csum_valid_required:1;
++	u8  hw_reserved:7;
++#else
++#error	"Please fix <asm/byteorder.h>"
++#endif
++	__be16 reserved;
++} __aligned(1);
++
++#ifdef QUECTEL_BRIDGE_MODE
++static int is_qmap_netdev(const struct net_device *netdev);
++#endif
++#endif
++
++static const struct driver_info rmnet_usb_info;
++
++#ifdef QUECTEL_BRIDGE_MODE
++static int bridge_arp_reply(struct net_device *net, struct sk_buff *skb, uint bridge_ipv4) {
++    struct arphdr *parp;
++    u8 *arpptr, *sha;
++    u8  sip[4], tip[4], ipv4[4];
++    struct sk_buff *reply = NULL;
++
++    ipv4[0]  = (bridge_ipv4 >> 24) & 0xFF;
++    ipv4[1]  = (bridge_ipv4 >> 16) & 0xFF;
++    ipv4[2]  = (bridge_ipv4 >> 8) & 0xFF;
++    ipv4[3]  = (bridge_ipv4 >> 0) & 0xFF;
++
++    parp = arp_hdr(skb);
++
++    if (parp->ar_hrd == htons(ARPHRD_ETHER)  && parp->ar_pro == htons(ETH_P_IP)
++        && parp->ar_op == htons(ARPOP_REQUEST) && parp->ar_hln == 6 && parp->ar_pln == 4) {
++        arpptr = (u8 *)parp + sizeof(struct arphdr);
++        sha = arpptr;
++        arpptr += net->addr_len;	/* sha */
++        memcpy(sip, arpptr, sizeof(sip));
++        arpptr += sizeof(sip);
++        arpptr += net->addr_len;	/* tha */
++        memcpy(tip, arpptr, sizeof(tip));
++
++        pr_info("%s sip = %d.%d.%d.%d, tip=%d.%d.%d.%d, ipv4=%d.%d.%d.%d\n", netdev_name(net),
++            sip[0], sip[1], sip[2], sip[3], tip[0], tip[1], tip[2], tip[3], ipv4[0], ipv4[1], ipv4[2], ipv4[3]);
++	//wwan0 sip = 10.151.137.255, tip=10.151.138.0, ipv4=10.151.137.255
++        if (tip[0] == ipv4[0] && tip[1] == ipv4[1] && (tip[2]&0xFC) == (ipv4[2]&0xFC) && tip[3] != ipv4[3])
++            reply = arp_create(ARPOP_REPLY, ETH_P_ARP, *((__be32 *)sip), net, *((__be32 *)tip), sha, default_modem_addr, sha);
++
++        if (reply) {
++            skb_reset_mac_header(reply);
++            __skb_pull(reply, skb_network_offset(reply));
++            reply->ip_summed = CHECKSUM_UNNECESSARY;
++            reply->pkt_type = PACKET_HOST;
++
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION( 5,18,0 ))
++            netif_rx(reply);
++#else
++            netif_rx_ni(reply);
++#endif
++        }
++        return 1;
++    }
++
++    return 0;
++}
++
++static struct sk_buff *bridge_mode_tx_fixup(struct net_device *net, struct sk_buff *skb, uint bridge_ipv4, unsigned char *bridge_mac) {
++	struct ethhdr *ehdr;
++	const struct iphdr *iph;
++
++	skb_reset_mac_header(skb);
++	ehdr = eth_hdr(skb);
++
++	if (ehdr->h_proto == htons(ETH_P_ARP)) {
++		if (bridge_ipv4)
++			bridge_arp_reply(net, skb, bridge_ipv4);
++		return NULL;
++	}
++
++	iph = ip_hdr(skb);
++	//DBG("iphdr: ");
++	//PrintHex((void *)iph, sizeof(struct iphdr));
++
++// 1	0.000000000	0.0.0.0	255.255.255.255	DHCP	362	DHCP Request  - Transaction ID 0xe7643ad7
++	if (ehdr->h_proto == htons(ETH_P_IP) && iph->protocol == IPPROTO_UDP && iph->saddr == 0x00000000 && iph->daddr == 0xFFFFFFFF) {
++		//if (udp_hdr(skb)->dest == htons(67)) //DHCP Request
++		{
++			memcpy(bridge_mac, ehdr->h_source, ETH_ALEN);
++			pr_info("%s PC Mac Address: %02x:%02x:%02x:%02x:%02x:%02x\n", netdev_name(net),
++				bridge_mac[0], bridge_mac[1], bridge_mac[2], bridge_mac[3], bridge_mac[4], bridge_mac[5]);
++		}
++	}
++
++#ifdef CONFIG_BRIDGE_LAN
++	//bridge Lan IP 192.168.0.0
++	if (ehdr->h_proto == htons(ETH_P_IP) && (iph->daddr & 0xFFFF) == 0xA8C0)
++	{
++	    struct sk_buff *reply = skb_copy(skb, GFP_ATOMIC);
++	    ehdr = eth_hdr(reply);
++
++		memcpy(ehdr->h_source, default_modem_addr, ETH_ALEN);
++		if(is_qmap_netdev(net))
++	    {
++			struct qmap_priv *priv = netdev_priv(net);
++	        memcpy(ehdr->h_dest, priv->bridge_self_mac, ETH_ALEN);
++	    }
++	    else
++	    {
++			struct usbnet * usbnetdev = netdev_priv(net);
++			struct qmi_wwan_state *info = (void *)&usbnetdev->data;
++			sQmiWwanQmap *pQmapDev = (sQmiWwanQmap *)info->unused;
++	        memcpy(ehdr->h_dest, pQmapDev->bridge_self_mac, ETH_ALEN);
++	    }
++
++		//pr_info("%s br rx pkt addr: %02x:%02x:%02x:%02x:%02x:%02x -> %02x:%02x:%02x:%02x:%02x:%02x\n", netdev_name(net),
++        //    ehdr->h_source[0], ehdr->h_source[1], ehdr->h_source[2], ehdr->h_source[3], ehdr->h_source[4], ehdr->h_source[5],
++        //    ehdr->h_dest[0], ehdr->h_dest[1], ehdr->h_dest[2], ehdr->h_dest[3], ehdr->h_dest[4], ehdr->h_dest[5]);
++
++		skb_reset_mac_header(reply);
++        __skb_pull(reply, skb_network_offset(reply));
++        reply->ip_summed = CHECKSUM_UNNECESSARY;
++        reply->pkt_type = PACKET_HOST;
++        netif_rx_ni(reply);
++		return NULL;
++	}
++#endif
++
++	if (memcmp(ehdr->h_source, bridge_mac, ETH_ALEN)) {
++		return NULL;
++	}
++
++	return skb;
++}
++
++static void bridge_mode_rx_fixup(sQmiWwanQmap *pQmapDev, struct net_device *net, struct sk_buff *skb) {
++	uint bridge_mode = 0;
++	unsigned char *bridge_mac;
++
++	if (pQmapDev->qmap_mode > 1 || pQmapDev->use_rmnet_usb == 1) {
++		struct qmap_priv *priv = netdev_priv(net);
++		bridge_mode = priv->bridge_mode;
++		bridge_mac = priv->bridge_mac;
++	}
++	else {
++		bridge_mode = pQmapDev->bridge_mode;
++		bridge_mac = pQmapDev->bridge_mac;
++	}
++
++	if (bridge_mode)
++		memcpy(eth_hdr(skb)->h_dest, bridge_mac, ETH_ALEN);
++	else
++		memcpy(eth_hdr(skb)->h_dest, net->dev_addr, ETH_ALEN);
++}
++#endif
++
++#if defined(QUECTEL_WWAN_QMAP)
++static ssize_t qmap_mode_show(struct device *dev, struct device_attribute *attr, char *buf) {
++	struct net_device *netdev = to_net_dev(dev);
++	struct usbnet * usbnetdev = netdev_priv( netdev );
++	struct qmi_wwan_state *info = (void *)&usbnetdev->data;
++	sQmiWwanQmap *pQmapDev = (sQmiWwanQmap *)info->unused;
++
++	return snprintf(buf, PAGE_SIZE, "%d\n",  pQmapDev->qmap_mode);
++}
++
++static DEVICE_ATTR(qmap_mode, S_IRUGO, qmap_mode_show, NULL);
++
++static ssize_t qmap_size_show(struct device *dev, struct device_attribute *attr, char *buf) {
++	struct net_device *netdev = to_net_dev(dev);
++	struct usbnet * usbnetdev = netdev_priv( netdev );
++	struct qmi_wwan_state *info = (void *)&usbnetdev->data;
++	sQmiWwanQmap *pQmapDev = (sQmiWwanQmap *)info->unused;
++
++	return snprintf(buf, PAGE_SIZE, "%u\n",  pQmapDev->qmap_size);
++}
++
++static DEVICE_ATTR(qmap_size, S_IRUGO, qmap_size_show, NULL);
++
++static ssize_t link_state_show(struct device *dev, struct device_attribute *attr, char *buf) {
++	struct net_device *netdev = to_net_dev(dev);
++	struct usbnet * usbnetdev = netdev_priv( netdev );
++	struct qmi_wwan_state *info = (void *)&usbnetdev->data;
++	sQmiWwanQmap *pQmapDev = (sQmiWwanQmap *)info->unused;
++
++	return snprintf(buf, PAGE_SIZE, "0x%x\n",  pQmapDev->link_state);
++}
++
++static ssize_t link_state_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count) {
++	struct net_device *netdev = to_net_dev(dev);
++	struct usbnet * usbnetdev = netdev_priv( netdev );
++	struct qmi_wwan_state *info = (void *)&usbnetdev->data;
++	sQmiWwanQmap *pQmapDev = (sQmiWwanQmap *)info->unused;
++	unsigned link_state = 0;
++	unsigned old_link = pQmapDev->link_state;
++	uint offset_id = 0;
++
++	link_state = simple_strtoul(buf, NULL, 0);
++
++	if (pQmapDev->qmap_mode == 1) {
++		pQmapDev->link_state = !!link_state;
++	}
++	else if (pQmapDev->qmap_mode > 1) {
++		offset_id = ((link_state&0x7F) - 1);
++
++		if (offset_id >= pQmapDev->qmap_mode) {
++			dev_info(dev, "%s offset_id is %d. but qmap_mode is %d\n", __func__, offset_id, pQmapDev->qmap_mode);
++			return count;
++		}
++
++		if (link_state&0x80)
++			pQmapDev->link_state &= ~(1 << offset_id);
++		else
++			pQmapDev->link_state |= (1 << offset_id);
++	}
++
++	if (old_link != pQmapDev->link_state) {
++		struct net_device *qmap_net = pQmapDev->mpQmapNetDev[offset_id];
++
++		if (usbnetdev->net->flags & IFF_UP) {
++			if (pQmapDev->link_state) {
++				netif_carrier_on(usbnetdev->net);
++			}
++		}
++
++		if (qmap_net && qmap_net != netdev) {
++			struct qmap_priv *priv = netdev_priv(qmap_net);
++
++			priv->link_state = !!(pQmapDev->link_state & (1 << offset_id));
++
++			if (qmap_net->flags & IFF_UP) {
++				if (priv->link_state) {
++					netif_carrier_on(qmap_net);
++					if (netif_queue_stopped(qmap_net) && !netif_queue_stopped(usbnetdev->net))
++						netif_wake_queue(qmap_net);
++				}
++				else {
++					netif_carrier_off(qmap_net);
++				}
++			}
++		}
++
++		if (usbnetdev->net->flags & IFF_UP) {
++			if (!pQmapDev->link_state) {
++				netif_carrier_off(usbnetdev->net);
++			}
++		}
++
++		dev_info(dev, "link_state 0x%x -> 0x%x\n", old_link, pQmapDev->link_state);
++	}
++
++	return count;
++}
++
++#ifdef QUECTEL_BRIDGE_MODE
++static ssize_t bridge_mode_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count) {
++	struct net_device *netdev = to_net_dev(dev);
++	uint old_mode = 0;
++	uint bridge_mode = simple_strtoul(buf, NULL, 0);
++
++	if (netdev->type != ARPHRD_ETHER) {
++		return count;
++	}
++
++	if (is_qmap_netdev(netdev)) {
++		struct qmap_priv *priv = netdev_priv(netdev);
++		old_mode = priv->bridge_mode;
++		priv->bridge_mode = bridge_mode;
++	}
++	else {
++		struct usbnet * usbnetdev = netdev_priv( netdev );
++		struct qmi_wwan_state *info = (void *)&usbnetdev->data;
++		sQmiWwanQmap *pQmapDev = (sQmiWwanQmap *)info->unused;
++		old_mode = pQmapDev->bridge_mode;
++		pQmapDev->bridge_mode = bridge_mode;
++	}
++
++	if (old_mode != bridge_mode) {
++		dev_info(dev, "bridge_mode change to 0x%x\n", bridge_mode);
++	}
++
++	return count;
++}
++
++static ssize_t bridge_mode_show(struct device *dev, struct device_attribute *attr, char *buf) {
++	struct net_device *netdev = to_net_dev(dev);
++	uint bridge_mode = 0;
++
++	if (is_qmap_netdev(netdev)) {
++		struct qmap_priv *priv = netdev_priv(netdev);
++		bridge_mode = priv->bridge_mode;
++	}
++	else {
++		struct usbnet * usbnetdev = netdev_priv( netdev );
++		struct qmi_wwan_state *info = (void *)&usbnetdev->data;
++		sQmiWwanQmap *pQmapDev = (sQmiWwanQmap *)info->unused;
++		bridge_mode = pQmapDev->bridge_mode;
++	}
++
++	return snprintf(buf, PAGE_SIZE, "%u\n", bridge_mode);
++}
++
++static ssize_t bridge_ipv4_show(struct device *dev, struct device_attribute *attr, char *buf) {
++	struct net_device *netdev = to_net_dev(dev);
++	unsigned int bridge_ipv4 = 0;
++	unsigned char ipv4[4];
++
++	if (is_qmap_netdev(netdev)) {
++		struct qmap_priv *priv = netdev_priv(netdev);
++		bridge_ipv4 = priv->bridge_ipv4;
++	}
++	else {
++		struct usbnet * usbnetdev = netdev_priv( netdev );
++		struct qmi_wwan_state *info = (void *)&usbnetdev->data;
++		sQmiWwanQmap *pQmapDev = (sQmiWwanQmap *)info->unused;
++		bridge_ipv4 = pQmapDev->bridge_ipv4;
++	}
++
++	ipv4[0]  = (bridge_ipv4 >> 24) & 0xFF;
++	ipv4[1]  = (bridge_ipv4 >> 16) & 0xFF;
++	ipv4[2]  = (bridge_ipv4 >> 8) & 0xFF;
++	ipv4[3]  = (bridge_ipv4 >> 0) & 0xFF;
++
++	return snprintf(buf, PAGE_SIZE, "%d.%d.%d.%d\n",  ipv4[0], ipv4[1], ipv4[2], ipv4[3]);
++}
++
++static ssize_t bridge_ipv4_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count) {
++	struct net_device *netdev = to_net_dev(dev);
++
++	if (is_qmap_netdev(netdev)) {
++		struct qmap_priv *priv = netdev_priv(netdev);
++		priv->bridge_ipv4 = simple_strtoul(buf, NULL, 16);
++	}
++	else {
++		struct usbnet * usbnetdev = netdev_priv( netdev );
++		struct qmi_wwan_state *info = (void *)&usbnetdev->data;
++		sQmiWwanQmap *pQmapDev = (sQmiWwanQmap *)info->unused;
++		pQmapDev->bridge_ipv4 = simple_strtoul(buf, NULL, 16);
++	}
++
++	return count;
++}
++#endif
++
++static DEVICE_ATTR(link_state, S_IWUSR | S_IRUGO, link_state_show, link_state_store);
++#ifdef QUECTEL_BRIDGE_MODE
++static DEVICE_ATTR(bridge_mode, S_IWUSR | S_IRUGO, bridge_mode_show, bridge_mode_store);
++static DEVICE_ATTR(bridge_ipv4, S_IWUSR | S_IRUGO, bridge_ipv4_show, bridge_ipv4_store);
++#endif
++
++static struct attribute *qmi_wwan_sysfs_attrs[] = {
++	&dev_attr_link_state.attr,
++	&dev_attr_qmap_mode.attr,
++	&dev_attr_qmap_size.attr,
++#ifdef QUECTEL_BRIDGE_MODE
++	&dev_attr_bridge_mode.attr,
++	&dev_attr_bridge_ipv4.attr,
++#endif
++	NULL,
++};
++
++static struct attribute_group qmi_wwan_sysfs_attr_group = {
++	.attrs = qmi_wwan_sysfs_attrs,
++};
++
++#ifdef QUECTEL_BRIDGE_MODE
++static struct attribute *qmi_qmap_sysfs_attrs[] = {
++	&dev_attr_bridge_mode.attr,
++	&dev_attr_bridge_ipv4.attr,
++	NULL,
++};
++
++static struct attribute_group qmi_qmap_sysfs_attr_group = {
++	.attrs = qmi_qmap_sysfs_attrs,
++};
++#endif
++
++static int qmap_open(struct net_device *qmap_net)
++{
++	struct qmap_priv *priv = netdev_priv(qmap_net);
++	struct net_device *real_dev = priv->real_dev;
++
++	//printk("%s %s real_dev %d %d %d %d+++\n", __func__, dev->name,
++	//    netif_carrier_ok(real_dev), netif_queue_stopped(real_dev), netif_carrier_ok(dev), netif_queue_stopped(dev));
++
++	if (!(priv->real_dev->flags & IFF_UP))
++		return -ENETDOWN;
++
++	if (priv->link_state) {
++		netif_carrier_on(real_dev);
++		netif_carrier_on(qmap_net);
++		if (netif_queue_stopped(qmap_net) && !netif_queue_stopped(real_dev))
++			netif_wake_queue(qmap_net);
++	}
++	//printk("%s %s real_dev %d %d %d %d---\n", __func__, dev->name,
++	//    netif_carrier_ok(real_dev), netif_queue_stopped(real_dev), netif_carrier_ok(dev), netif_queue_stopped(dev));
++
++	return 0;
++}
++
++static int qmap_stop(struct net_device *qmap_net)
++{
++	//printk("%s %s %d %d+++\n", __func__, dev->name,
++	//   netif_carrier_ok(dev), netif_queue_stopped(dev));
++
++	netif_carrier_off(qmap_net);
++	return 0;
++}
++
++static void qmap_wake_queue(sQmiWwanQmap *pQmapDev)
++{
++	uint i = 0;
++
++	if (!pQmapDev || !pQmapDev->use_rmnet_usb)
++		return;
++
++	for (i = 0; i < pQmapDev->qmap_mode; i++) {
++		struct net_device *qmap_net = pQmapDev->mpQmapNetDev[i];
++
++		if (qmap_net && netif_carrier_ok(qmap_net) && netif_queue_stopped(qmap_net)) {
++			netif_wake_queue(qmap_net);
++		}
++	}
++}
++
++static struct sk_buff * add_qhdr(struct sk_buff *skb, u8 mux_id, int *hdr_data, int ip_offset) {
++	struct qmap_hdr *qhdr;
++	int pad = 0;
++
++	pad = skb->len%4;
++	if (pad) {
++		pad = 4 - pad;
++		if (skb_tailroom(skb) < pad) {
++			//printk("skb_tailroom small!\n");
++			pad = 0;
++		}
++		if (pad)
++			__skb_put(skb, pad);
++	}
++
++	if (hdr_data) {
++		qhdr = (struct qmap_hdr *)hdr_data;
++		qhdr->pkt_len = cpu_to_be16(skb->len - ip_offset);
++	}
++	else {
++		qhdr = (struct qmap_hdr *)skb_push(skb, sizeof(struct qmap_hdr));
++		qhdr->pkt_len = cpu_to_be16(skb->len - sizeof(struct qmap_hdr));
++	}
++	qhdr->cd_rsvd_pad = pad;
++	qhdr->mux_id = mux_id;
++
++	return skb;
++}
++
++static struct sk_buff * add_qhdr_v5(struct sk_buff *skb, u8 mux_id, int *hdr_data, int ip_offset) {
++	struct rmnet_map_header *map_header;
++	struct rmnet_map_v5_csum_header *ul_header;
++	int pad = 0;
++
++	pad = (skb->len - ip_offset) %4;
++	if (pad) {
++		pad = 4 - pad;
++		if (skb_tailroom(skb) < pad) {
++			//printk("skb_tailroom small!\n");
++			pad = 0;
++		}
++		if (pad)
++			__skb_put(skb, pad);
++	}
++
++	if (hdr_data) {
++		map_header = (struct rmnet_map_header *)hdr_data;
++		map_header->pkt_len = htons(skb->len - ip_offset);
++	}
++	else {
++		map_header = (struct rmnet_map_header *)skb_push(skb, (sizeof(struct rmnet_map_header) + sizeof(struct rmnet_map_v5_csum_header)));
++		map_header->pkt_len = htons(skb->len - (sizeof(struct rmnet_map_header) + sizeof(struct rmnet_map_v5_csum_header)));
++	}
++	map_header->cd_bit = 0;
++	map_header->next_hdr = 1;
++	map_header->pad_len = pad;
++	map_header->mux_id = mux_id;
++
++	ul_header = (struct rmnet_map_v5_csum_header *)(map_header + 1);
++	memset(ul_header, 0, sizeof(*ul_header));
++	ul_header->header_type = RMNET_MAP_HEADER_TYPE_CSUM_OFFLOAD;
++	if (skb->ip_summed == CHECKSUM_PARTIAL) {
++#if 0 //TODO
++		skb->ip_summed = CHECKSUM_NONE;
++		/* Ask for checksum offloading */
++		ul_header->csum_valid_required = 1;
++#endif
++	}
++
++	return skb;
++}
++
++static void rmnet_vnd_update_rx_stats(struct net_device *net,
++			unsigned rx_packets, unsigned rx_bytes) {
++#if defined(MHI_NETDEV_STATUS64)
++	struct qmap_priv *dev = netdev_priv(net);
++	struct pcpu_sw_netstats *stats64 = this_cpu_ptr(dev->stats64);
++
++	u64_stats_update_begin(&stats64->syncp);
++#if (LINUX_VERSION_CODE < KERNEL_VERSION( 6,0,0 ))
++	stats64->rx_packets += rx_packets;
++	stats64->rx_bytes += rx_bytes;
++#else
++    u64_stats_add(&stats64->rx_packets, rx_packets);
++    u64_stats_add(&stats64->rx_bytes, rx_bytes);
++#endif
++	u64_stats_update_end(&stats64->syncp);
++#else
++	net->stats.rx_packets += rx_packets;
++	net->stats.rx_bytes += rx_bytes;
++#endif
++}
++
++static void rmnet_vnd_update_tx_stats(struct net_device *net,
++			unsigned tx_packets, unsigned tx_bytes) {
++#if defined(MHI_NETDEV_STATUS64)
++	struct qmap_priv *dev = netdev_priv(net);
++	struct pcpu_sw_netstats *stats64 = this_cpu_ptr(dev->stats64);
++
++	u64_stats_update_begin(&stats64->syncp);
++#if (LINUX_VERSION_CODE < KERNEL_VERSION( 6,0,0 ))
++	stats64->tx_packets += tx_packets;
++	stats64->tx_bytes += tx_bytes;
++#else
++    u64_stats_add(&stats64->tx_packets, tx_packets);
++    u64_stats_add(&stats64->tx_bytes, tx_bytes);
++#endif
++	u64_stats_update_end(&stats64->syncp);
++#else
++	net->stats.tx_packets += tx_packets;
++	net->stats.tx_bytes += tx_bytes;
++#endif
++}
++
++#if defined(MHI_NETDEV_STATUS64)
++static struct rtnl_link_stats64 *_rmnet_vnd_get_stats64(struct net_device *net, struct rtnl_link_stats64 *stats)
++{
++	struct qmap_priv *dev = netdev_priv(net);
++	unsigned int start;
++	int cpu;
++
++	netdev_stats_to_stats64(stats, &net->stats);
++
++	if (nss_cb && dev->use_qca_nss) { // rmnet_nss.c:rmnet_nss_tx() will update rx stats
++		stats->rx_packets = 0;
++		stats->rx_bytes = 0;
++	}
++
++	for_each_possible_cpu(cpu) {
++		struct pcpu_sw_netstats *stats64;
++#if (LINUX_VERSION_CODE < KERNEL_VERSION( 6,1,0 ))
++		u64 rx_packets, rx_bytes;
++		u64 tx_packets, tx_bytes;
++
++		stats64 = per_cpu_ptr(dev->stats64, cpu);
++
++		do {
++			start = u64_stats_fetch_begin_irq(&stats64->syncp);
++			rx_packets = stats64->rx_packets;
++			rx_bytes = stats64->rx_bytes;
++			tx_packets = stats64->tx_packets;
++			tx_bytes = stats64->tx_bytes;
++		} while (u64_stats_fetch_retry_irq(&stats64->syncp, start));
++
++		stats->rx_packets += rx_packets;
++		stats->rx_bytes += rx_bytes;
++		stats->tx_packets += tx_packets;
++		stats->tx_bytes += tx_bytes;
++#else
++        u64_stats_t rx_packets, rx_bytes;
++		u64_stats_t tx_packets, tx_bytes;
++
++		stats64 = per_cpu_ptr(dev->stats64, cpu);
++
++		do {
++			start = u64_stats_fetch_begin_irq(&stats64->syncp);
++			rx_packets = stats64->rx_packets;
++			rx_bytes = stats64->rx_bytes;
++			tx_packets = stats64->tx_packets;
++			tx_bytes = stats64->tx_bytes;
++		} while (u64_stats_fetch_retry_irq(&stats64->syncp, start));
++
++        stats->rx_packets += u64_stats_read(&rx_packets);
++		stats->rx_bytes += u64_stats_read(&rx_bytes);
++		stats->tx_packets += u64_stats_read(&tx_packets);
++		stats->tx_bytes += u64_stats_read(&tx_bytes);
++#endif
++	}
++
++	return stats;
++}
++
++#if (LINUX_VERSION_CODE > KERNEL_VERSION( 4,10,0 )) //bc1f44709cf27fb2a5766cadafe7e2ad5e9cb221
++static void rmnet_vnd_get_stats64(struct net_device *net, struct rtnl_link_stats64 *stats) {
++	_rmnet_vnd_get_stats64(net, stats);
++}
++#else
++static struct rtnl_link_stats64 *rmnet_vnd_get_stats64(struct net_device *net, struct rtnl_link_stats64 *stats) {
++	return _rmnet_vnd_get_stats64(net, stats);
++}
++#endif
++#endif
++
++#if defined(QUECTEL_UL_DATA_AGG)
++static void usbnet_bh(unsigned long data) {
++	sQmiWwanQmap *pQmapDev = (sQmiWwanQmap *)data;
++	struct tasklet_struct *t = &pQmapDev->usbnet_bh;
++	bool use_callback = false;
++
++#if (LINUX_VERSION_CODE > KERNEL_VERSION( 5,8,0 )) //c955e329bb9d44fab75cf2116542fcc0de0473c5
++	use_callback = t->use_callback;
++	if (use_callback)
++		t->callback(&pQmapDev->mpNetDev->bh);
++#endif
++
++	if (!use_callback)
++		t->func(t->data);
++
++	if (!netif_queue_stopped(pQmapDev->mpNetDev->net)) {
++		qmap_wake_queue((sQmiWwanQmap *)data);
++	}
++}
++
++static void rmnet_usb_tx_wake_queue(unsigned long data) {
++	qmap_wake_queue((sQmiWwanQmap *)data);
++}
++
++#if 0
++static void rmnet_usb_tx_skb_destructor(struct sk_buff *skb) {
++	struct net_device	*net = skb->dev;
++	struct usbnet * dev = netdev_priv( net );
++	struct qmi_wwan_state *info = (void *)&dev->data;
++	sQmiWwanQmap *pQmapDev = (sQmiWwanQmap *)info->unused;
++
++	if (pQmapDev && pQmapDev->use_rmnet_usb) {
++		int i;
++
++		for (i = 0; i < pQmapDev->qmap_mode; i++) {
++			struct net_device *qmap_net = pQmapDev->mpQmapNetDev[i];
++
++			if (qmap_net && netif_carrier_ok(qmap_net) && netif_queue_stopped(qmap_net)) {
++				tasklet_schedule(&pQmapDev->txq);
++				break;
++			}
++		}
++	}
++}
++#endif
++
++static int rmnet_usb_tx_agg_skip(struct sk_buff *skb, int offset)
++{
++	u8 *packet_start = skb->data + offset;
++	int ready2send = 0;
++
++	if (skb->protocol == htons(ETH_P_IP)) {
++		struct iphdr *ip4h = (struct iphdr *)(packet_start);
++
++		if (ip4h->protocol == IPPROTO_TCP) {
++			const struct tcphdr *th = (const struct tcphdr *)(packet_start + sizeof(struct iphdr));
++			if (th->psh) {
++				ready2send = 1;
++			}
++		}
++		else if (ip4h->protocol == IPPROTO_ICMP)
++			ready2send = 1;
++
++	} else if (skb->protocol == htons(ETH_P_IPV6)) {
++		struct ipv6hdr *ip6h = (struct ipv6hdr *)(packet_start);
++
++		if (ip6h->nexthdr == NEXTHDR_TCP) {
++			const struct tcphdr *th = (const struct tcphdr *)(packet_start + sizeof(struct ipv6hdr));
++			if (th->psh) {
++				ready2send = 1;
++			}
++		} else if (ip6h->nexthdr == NEXTHDR_ICMP) {
++			ready2send = 1;
++		} else if (ip6h->nexthdr == NEXTHDR_FRAGMENT) {
++			struct frag_hdr *frag;
++
++			frag = (struct frag_hdr *)(packet_start
++						   + sizeof(struct ipv6hdr));
++			if (frag->nexthdr == IPPROTO_ICMPV6)
++				ready2send = 1;
++		}
++	}
++
++	return ready2send;
++}
++
++static void rmnet_usb_tx_agg_work(struct work_struct *work)
++{
++	struct qmap_priv *priv =
++			container_of(work, struct qmap_priv, agg_wq);
++	struct sk_buff *skb = NULL;
++	unsigned long flags;
++
++	spin_lock_irqsave(&priv->agg_lock, flags);
++	if (likely(priv->agg_skb)) {
++		skb = priv->agg_skb;
++		priv->agg_skb = NULL;
++		priv->agg_count = 0;
++		skb->protocol = htons(ETH_P_MAP);
++		skb->dev = priv->real_dev;
++		ktime_get_ts64(&priv->agg_time);
++	}
++	spin_unlock_irqrestore(&priv->agg_lock, flags);
++
++	if (skb) {
++		int err;
++#if 0
++		if (!skb->destructor)
++			skb->destructor = rmnet_usb_tx_skb_destructor;
++#endif
++		err = dev_queue_xmit(skb);
++		if (err != NET_XMIT_SUCCESS) {
++			priv->self_dev->stats.tx_errors++;
++		}
++	}
++}
++
++static enum hrtimer_restart  rmnet_usb_tx_agg_timer_cb(struct hrtimer *timer)
++{
++	struct qmap_priv *priv =
++			container_of(timer, struct qmap_priv, agg_hrtimer);
++
++	schedule_work(&priv->agg_wq);
++	return HRTIMER_NORESTART;
++}
++
++static long agg_time_limit __read_mostly = 1000000L; //reduce this time, can get better TPUT performance, but will increase USB interrupts
++module_param(agg_time_limit, long, S_IRUGO | S_IWUSR);
++MODULE_PARM_DESC(agg_time_limit, "Maximum time packets sit in the agg buf");
++
++static long agg_bypass_time __read_mostly = 10000000L;
++module_param(agg_bypass_time, long, S_IRUGO | S_IWUSR);
++MODULE_PARM_DESC(agg_bypass_time, "Skip agg when apart spaced more than this");
++
++static int rmnet_usb_tx_agg(struct sk_buff *skb, struct qmap_priv *priv, int *hdr_data, int hdr_len, int ip_offset) {
++	struct qmi_wwan_state *info = (void *)&priv->dev->data;
++	sQmiWwanQmap *pQmapDev = (sQmiWwanQmap *)info->unused;
++	struct tx_agg_ctx *ctx = &pQmapDev->tx_ctx;
++	int ready2send = 0;
++	int xmit_more = 0;
++	struct timespec64 diff, now;
++	struct sk_buff *agg_skb = NULL;
++	unsigned long flags;
++	int err;
++	struct net_device *pNet = priv->self_dev;
++
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5,1,0) //6b16f9ee89b8d5709f24bc3ac89ae8b5452c0d7c
++#if LINUX_VERSION_CODE > KERNEL_VERSION(3,16,0)
++	xmit_more = skb->xmit_more;
++#endif
++#else
++	xmit_more = netdev_xmit_more();
++#endif
++
++	rmnet_vnd_update_tx_stats(pNet, 1, skb->len);
++
++	if (ctx->ul_data_aggregation_max_datagrams == 1) {
++		agg_skb = alloc_skb(skb->len + hdr_len, GFP_ATOMIC);
++		if (agg_skb) {
++			memcpy(skb_put(agg_skb, hdr_len), hdr_data, hdr_len);
++			memcpy(skb_put(agg_skb, skb->len - ip_offset), skb->data + ip_offset, skb->len - ip_offset);
++			agg_skb->protocol = htons(ETH_P_MAP);
++			agg_skb->dev = priv->real_dev;
++#if 0
++			if (!agg_skb->destructor)
++				agg_skb->destructor = rmnet_usb_tx_skb_destructor;
++#endif
++		err = dev_queue_xmit(agg_skb);
++		if (err != NET_XMIT_SUCCESS)
++			pNet->stats.tx_errors++;
++		}
++		dev_kfree_skb_any(skb);
++		skb = NULL;
++		return NET_XMIT_SUCCESS;
++	}
++
++new_packet:
++	spin_lock_irqsave(&priv->agg_lock, flags);
++	agg_skb = NULL;
++	ready2send = 0;
++	ktime_get_ts64(&now);
++	diff = timespec64_sub(now, priv->agg_time);
++
++	if (priv->agg_skb) {
++		if ((priv->agg_skb->len + skb->len + hdr_len) < ctx->ul_data_aggregation_max_size) {
++			memcpy(skb_put(priv->agg_skb, hdr_len), hdr_data, hdr_len);
++			memcpy(skb_put(priv->agg_skb, skb->len - ip_offset), skb->data + ip_offset, skb->len - ip_offset);
++			priv->agg_count++;
++
++			if (diff.tv_sec > 0 || diff.tv_nsec > agg_time_limit) {
++				ready2send = 1;
++			}
++			else if (priv->agg_count == ctx->ul_data_aggregation_max_datagrams) {
++				ready2send = 1;
++			}
++			else if (xmit_more == 0) {
++				struct rmnet_map_header *map_header = (struct rmnet_map_header *)hdr_data;
++				size_t offset = sizeof(struct rmnet_map_header);
++				if (map_header->next_hdr)
++					offset += sizeof(struct rmnet_map_v5_csum_header);
++
++				ready2send = rmnet_usb_tx_agg_skip(skb, offset);
++			}
++
++			dev_kfree_skb_any(skb);
++			skb = NULL;
++		}
++		else {
++			ready2send = 1;
++		}
++
++		if (ready2send) {
++			agg_skb = priv->agg_skb;
++			priv->agg_skb = NULL;
++			priv->agg_count = 0;
++		}
++	}
++	else if (skb) {
++		if (diff.tv_sec > 0 || diff.tv_nsec > agg_bypass_time) {
++			ready2send = 1;
++		}
++		else if (xmit_more == 0) {
++			struct rmnet_map_header *map_header = (struct rmnet_map_header *)hdr_data;
++			size_t offset = sizeof(struct rmnet_map_header);
++			if (map_header->next_hdr)
++				offset += sizeof(struct rmnet_map_v5_csum_header);
++
++			ready2send = rmnet_usb_tx_agg_skip(skb, offset);
++		}
++
++		if (ready2send == 0) {
++			priv->agg_skb = alloc_skb(ctx->ul_data_aggregation_max_size, GFP_ATOMIC);
++			if (priv->agg_skb) {
++				skb_reset_network_header(priv->agg_skb); //protocol da1a is buggy, dev wwan0
++				memcpy(skb_put(priv->agg_skb, hdr_len), hdr_data, hdr_len);
++				memcpy(skb_put(priv->agg_skb, skb->len - ip_offset), skb->data + ip_offset, skb->len - ip_offset);
++				priv->agg_count++;
++				dev_kfree_skb_any(skb);
++				skb = NULL;
++			}
++			else {
++				ready2send = 1;
++			}
++		}
++
++		if (ready2send) {
++			agg_skb = alloc_skb(skb->len + hdr_len, GFP_ATOMIC);
++			if (agg_skb) {
++				memcpy(skb_put(agg_skb, hdr_len), hdr_data, hdr_len);
++				memcpy(skb_put(agg_skb, skb->len - ip_offset), skb->data + ip_offset, skb->len - ip_offset);
++			}
++			dev_kfree_skb_any(skb);
++			skb = NULL;
++		}
++	}
++
++	if (ready2send) {
++		priv->agg_time = now;
++	}
++	spin_unlock_irqrestore(&priv->agg_lock, flags);
++
++	if (agg_skb) {
++		agg_skb->protocol = htons(ETH_P_MAP);
++		agg_skb->dev = priv->real_dev;
++#if 0
++		if (!agg_skb->destructor)
++			agg_skb->destructor = rmnet_usb_tx_skb_destructor;
++#endif
++		err = dev_queue_xmit(agg_skb);
++		if (err != NET_XMIT_SUCCESS) {
++			pNet->stats.tx_errors++;
++		}
++	}
++
++	if (skb) {
++		goto new_packet;
++	}
++
++	if (priv->agg_skb) {
++		if (!hrtimer_is_queued(&priv->agg_hrtimer))
++			hrtimer_start(&priv->agg_hrtimer, ns_to_ktime(NSEC_PER_MSEC * 2), HRTIMER_MODE_REL);
++	}
++
++	return NET_XMIT_SUCCESS;
++}
++#endif
++
++static netdev_tx_t rmnet_vnd_start_xmit(struct sk_buff *skb,
++					struct net_device *pNet)
++{
++	int err;
++	struct qmap_priv *priv = netdev_priv(pNet);
++	int qmap_hdr[2];
++	int hdr_len = 0;
++	int ip_offset = 0;
++
++	if (netif_queue_stopped(priv->real_dev)) {
++		netif_stop_queue(pNet);
++		return NETDEV_TX_BUSY;
++	}
++
++	//printk("%s 1 skb=%p, len=%d, protocol=%x, hdr_len=%d\n", __func__, skb, skb->len, skb->protocol, skb->hdr_len);
++	if (pNet->type == ARPHRD_ETHER) {
++		skb_reset_mac_header(skb);
++
++#ifdef QUECTEL_BRIDGE_MODE
++		if (priv->bridge_mode && bridge_mode_tx_fixup(pNet, skb, priv->bridge_ipv4, priv->bridge_mac) == NULL) {
++			dev_kfree_skb_any (skb);
++			return NETDEV_TX_OK;
++		}
++#endif
++
++#if 1
++		ip_offset = ETH_HLEN;
++#else
++		if (skb_pull(skb, ETH_HLEN) == NULL) {
++			dev_kfree_skb_any (skb);
++			return NETDEV_TX_OK;
++		}
++#endif
++	}
++	//printk("%s 2 skb=%p, len=%d, protocol=%x, hdr_len=%d\n", __func__, skb, skb->len, skb->protocol, skb->hdr_len);
++
++	if (priv->qmap_version == 5) {
++		add_qhdr(skb, priv->mux_id, qmap_hdr, ip_offset);
++		hdr_len = 4;
++	}
++	else if (priv->qmap_version == 9) {
++		add_qhdr_v5(skb, priv->mux_id, qmap_hdr, ip_offset);
++		hdr_len = 8;
++	}
++	else {
++		dev_kfree_skb_any (skb);
++		return NETDEV_TX_OK;
++	}
++	//printk("%s skb=%p, len=%d, protocol=%x, hdr_len=%d\n", __func__, skb, skb->len, skb->protocol, skb->hdr_len);
++
++	err = rmnet_usb_tx_agg(skb, priv, qmap_hdr, hdr_len, ip_offset);
++
++	return err;
++}
++
++static int rmnet_vnd_change_mtu(struct net_device *rmnet_dev, int new_mtu)
++{
++	if (new_mtu < 0)
++		return -EINVAL;
++
++  if (new_mtu > 1500)
++    printk("warning, set mtu greater than 1500, %d\n", new_mtu);
++
++	rmnet_dev->mtu = new_mtu;
++	return 0;
++}
++
++/* drivers may override default ethtool_ops in their bind() routine */
++static const struct ethtool_ops rmnet_vnd_ethtool_ops = {
++	.get_link		= ethtool_op_get_link,
++};
++
++static const struct net_device_ops rmnet_vnd_ops = {
++	.ndo_open       = qmap_open,
++	.ndo_stop       = qmap_stop,
++	.ndo_start_xmit = rmnet_vnd_start_xmit,
++	.ndo_change_mtu = rmnet_vnd_change_mtu,
++#if defined(MHI_NETDEV_STATUS64)
++	.ndo_get_stats64	= rmnet_vnd_get_stats64,
++#endif
++};
++
++static void rmnet_usb_ether_setup(struct net_device *rmnet_dev)
++{
++	ether_setup(rmnet_dev);
++
++	rmnet_dev->flags |= IFF_NOARP;
++	rmnet_dev->flags &= ~(IFF_BROADCAST | IFF_MULTICAST);
++
++#if LINUX_VERSION_CODE > KERNEL_VERSION(4,10,0)
++  rmnet_dev->max_mtu = 65535;
++#endif
++
++	rmnet_dev->ethtool_ops = &rmnet_vnd_ethtool_ops;
++	rmnet_dev->netdev_ops = &rmnet_vnd_ops;
++}
++
++static void rmnet_usb_rawip_setup(struct net_device *rmnet_dev)
++{
++	rmnet_dev->needed_headroom = 16;
++
++	/* Raw IP mode */
++	rmnet_dev->header_ops = NULL;  /* No header */
++	rmnet_dev->type = ARPHRD_RAWIP;
++	rmnet_dev->hard_header_len = 0;
++	rmnet_dev->flags |= IFF_NOARP;
++	rmnet_dev->flags &= ~(IFF_BROADCAST | IFF_MULTICAST);
++
++	rmnet_dev->ethtool_ops = &rmnet_vnd_ethtool_ops;
++	rmnet_dev->netdev_ops = &rmnet_vnd_ops;
++}
++
++static rx_handler_result_t qca_nss_rx_handler(struct sk_buff **pskb)
++{
++	struct sk_buff *skb = *pskb;
++
++	if (!skb)
++		return RX_HANDLER_CONSUMED;
++
++	//printk("%s skb=%p, len=%d, protocol=%x, hdr_len=%d\n", __func__, skb, skb->len, skb->protocol, skb->hdr_len);
++
++	if (skb->pkt_type == PACKET_LOOPBACK)
++		return RX_HANDLER_PASS;
++
++	/* Check this so that we dont loop around netif_receive_skb */
++	if (skb->cb[0] == 1) {
++		skb->cb[0] = 0;
++
++		return RX_HANDLER_PASS;
++	}
++
++	if (nss_cb) {
++		nss_cb->nss_tx(skb);
++		return RX_HANDLER_CONSUMED;
++	}
++
++	return RX_HANDLER_PASS;
++}
++
++static int qmap_register_device(sQmiWwanQmap * pDev, u8 offset_id)
++{
++	struct net_device *real_dev = pDev->mpNetDev->net;
++	struct net_device *qmap_net;
++	struct qmap_priv *priv;
++	int err;
++	char name[IFNAMSIZ];
++	int use_qca_nss = !!nss_cb;
++
++	sprintf(name, "%s_%d", real_dev->name, offset_id + 1);
++#ifdef NET_NAME_UNKNOWN
++	qmap_net = alloc_netdev(sizeof(struct qmap_priv), name,
++				NET_NAME_UNKNOWN, rmnet_usb_ether_setup);
++#else
++	qmap_net = alloc_netdev(sizeof(struct qmap_priv), name,
++				rmnet_usb_ether_setup);
++#endif
++    if (!qmap_net)
++        return -ENOBUFS;
++
++    SET_NETDEV_DEV(qmap_net, &real_dev->dev);
++    priv = netdev_priv(qmap_net);
++    priv->offset_id = offset_id;
++    priv->real_dev = real_dev;
++    priv->self_dev = qmap_net;
++    priv->dev = pDev->mpNetDev;
++    priv->qmap_version = pDev->qmap_version;
++    priv->mux_id = QUECTEL_QMAP_MUX_ID + offset_id;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,17,0)
++    __dev_addr_set(qmap_net, real_dev->dev_addr, ETH_ALEN);
++#else
++    memcpy (qmap_net->dev_addr, real_dev->dev_addr, ETH_ALEN);
++#endif
++
++#ifdef QUECTEL_BRIDGE_MODE
++	priv->bridge_mode = !!(pDev->bridge_mode & BIT(offset_id));
++	qmap_net->sysfs_groups[0] = &qmi_qmap_sysfs_attr_group;
++	if (priv->bridge_mode)
++		use_qca_nss = 0;
++#ifdef CONFIG_BRIDGE_LAN
++    memcpy(priv->bridge_self_mac, broadcast_mac_addr, ETH_ALEN);
++#endif
++#endif
++
++	if (nss_cb && use_qca_nss) {
++		rmnet_usb_rawip_setup(qmap_net);
++	}
++#ifdef CONFIG_PINCTRL_IPQ9574
++	rmnet_usb_rawip_setup(qmap_net);
++#endif
++	priv->agg_skb = NULL;
++	priv->agg_count = 0;
++	hrtimer_init(&priv->agg_hrtimer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
++	priv->agg_hrtimer.function = rmnet_usb_tx_agg_timer_cb;
++	INIT_WORK(&priv->agg_wq, rmnet_usb_tx_agg_work);
++	ktime_get_ts64(&priv->agg_time);
++	spin_lock_init(&priv->agg_lock);
++	priv->use_qca_nss = 0;
++
++#if defined(MHI_NETDEV_STATUS64)
++	priv->stats64 = netdev_alloc_pcpu_stats(struct pcpu_sw_netstats);
++	if (!priv->stats64) {
++		err = -ENOBUFS;
++		goto out_free_newdev;
++	}
++#endif
++
++	err = register_netdev(qmap_net);
++	if (err)
++		dev_info(&real_dev->dev, "%s(%s)=%d\n", __func__, qmap_net->name, err);
++	if (err < 0)
++		goto out_free_newdev;
++	netif_device_attach (qmap_net);
++	netif_carrier_off(qmap_net);
++
++	if (nss_cb && use_qca_nss) {
++		int rc = nss_cb->nss_create(qmap_net);
++		if (rc) {
++			/* Log, but don't fail the device creation */
++			netdev_err(qmap_net, "Device will not use NSS path: %d\n", rc);
++		} else {
++			priv->use_qca_nss = 1;
++			netdev_info(qmap_net, "NSS context created\n");
++			rtnl_lock();
++			netdev_rx_handler_register(qmap_net, qca_nss_rx_handler, NULL);
++			rtnl_unlock();
++		}
++	}
++
++	strcpy(pDev->rmnet_info.ifname[offset_id], qmap_net->name);
++	pDev->rmnet_info.mux_id[offset_id] = priv->mux_id;
++
++	pDev->mpQmapNetDev[offset_id] = qmap_net;
++
++	dev_info(&real_dev->dev, "%s %s\n", __func__, qmap_net->name);
++
++	return 0;
++
++out_free_newdev:
++	free_netdev(qmap_net);
++	return err;
++}
++
++static void qmap_unregister_device(sQmiWwanQmap * pDev, u8 offset_id) {
++	struct net_device *qmap_net = pDev->mpQmapNetDev[offset_id];
++
++	if (qmap_net != NULL && qmap_net != pDev->mpNetDev->net) {
++		struct qmap_priv *priv = netdev_priv(qmap_net);
++		unsigned long flags;
++
++		pr_info("qmap_unregister_device(%s)\n", qmap_net->name);
++		pDev->mpQmapNetDev[offset_id] = NULL;
++		netif_carrier_off( qmap_net );
++		netif_stop_queue( qmap_net );
++
++		hrtimer_cancel(&priv->agg_hrtimer);
++		cancel_work_sync(&priv->agg_wq);
++		spin_lock_irqsave(&priv->agg_lock, flags);
++		if (priv->agg_skb) {
++			kfree_skb(priv->agg_skb);
++		}
++		spin_unlock_irqrestore(&priv->agg_lock, flags);
++
++		if (nss_cb && priv->use_qca_nss) {
++			rtnl_lock();
++			netdev_rx_handler_unregister(qmap_net);
++			rtnl_unlock();
++			nss_cb->nss_free(qmap_net);
++		}
++
++#if defined(MHI_NETDEV_STATUS64)
++		free_percpu(priv->stats64);
++#endif
++		unregister_netdev (qmap_net);
++		free_netdev(qmap_net);
++	}
++}
++
++typedef struct {
++    unsigned int size;
++    unsigned int rx_urb_size;
++    unsigned int ep_type;
++    unsigned int iface_id;
++    unsigned int MuxId;
++    unsigned int ul_data_aggregation_max_datagrams; //0x17
++    unsigned int ul_data_aggregation_max_size ;//0x18
++    unsigned int dl_minimum_padding; //0x1A
++} QMAP_SETTING;
++
++#ifdef CONFIG_BRIDGE_LAN
++typedef struct {
++    u8 id;
++    u8 brmac[ETH_ALEN];
++} BRMAC_SETTING;
++#endif
++
++int qma_setting_store(struct device *dev, QMAP_SETTING *qmap_settings, size_t size) {
++	struct net_device *netdev = to_net_dev(dev);
++	struct usbnet * usbnetdev = netdev_priv( netdev );
++	struct qmi_wwan_state *info = (void *)&usbnetdev->data;
++	sQmiWwanQmap *pQmapDev = (sQmiWwanQmap *)info->unused;
++
++	if (qmap_settings->size != size) {
++		dev_err(dev, "ERROR: qmap_settings.size donot match!\n");
++		return -EOPNOTSUPP;
++	}
++
++#ifdef QUECTEL_UL_DATA_AGG
++	netif_tx_lock_bh(netdev);
++	if (pQmapDev->tx_ctx.ul_data_aggregation_max_datagrams == 1 && qmap_settings->ul_data_aggregation_max_datagrams > 1) {
++		pQmapDev->tx_ctx.ul_data_aggregation_max_datagrams = qmap_settings->ul_data_aggregation_max_datagrams;
++		pQmapDev->tx_ctx.ul_data_aggregation_max_size = qmap_settings->ul_data_aggregation_max_size;
++		pQmapDev->tx_ctx.dl_minimum_padding = qmap_settings->dl_minimum_padding;
++		dev_info(dev, "ul_data_aggregation_max_datagrams=%d, ul_data_aggregation_max_size=%d, dl_minimum_padding=%d\n",
++			pQmapDev->tx_ctx.ul_data_aggregation_max_datagrams,
++			pQmapDev->tx_ctx.ul_data_aggregation_max_size,
++			pQmapDev->tx_ctx.dl_minimum_padding);
++	}
++	netif_tx_unlock_bh(netdev);
++	return 0;
++#endif
++
++	return -EOPNOTSUPP;
++}
++
++static int qmap_ndo_do_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd) {
++	struct usbnet * usbnetdev = netdev_priv( dev );
++	struct qmi_wwan_state *info = (void *)&usbnetdev->data;
++	sQmiWwanQmap *pQmapDev = (sQmiWwanQmap *)info->unused;
++	int rc = -EOPNOTSUPP;
++	uint link_state = 0;
++ 	QMAP_SETTING qmap_settings = {0};
++#ifdef CONFIG_BRIDGE_LAN
++ 	BRMAC_SETTING brmac_settings = {0};
++#endif
++#ifdef CONFIG_CLEAR_HALT
++  uint clear_halt = 0;
++#endif
++
++
++	switch (cmd) {
++	case 0x89F1: //SIOCDEVPRIVATE
++		rc = copy_from_user(&link_state, ifr->ifr_ifru.ifru_data, sizeof(link_state));
++		if (!rc) {
++			char buf[32];
++			snprintf(buf, sizeof(buf), "%u", link_state);
++			link_state_store(&dev->dev, NULL, buf, strlen(buf));
++		}
++	break;
++
++	case 0x89F2: //SIOCDEVPRIVATE
++		rc = copy_from_user(&qmap_settings, ifr->ifr_ifru.ifru_data, sizeof(qmap_settings));
++		if (!rc) {
++			rc = qma_setting_store(&dev->dev, &qmap_settings, sizeof(qmap_settings));
++		}
++	break;
++
++	case 0x89F3: //SIOCDEVPRIVATE
++		if (pQmapDev->use_rmnet_usb) {
++			uint i;
++
++			for (i = 0; i < pQmapDev->qmap_mode; i++) {
++				struct net_device *qmap_net = pQmapDev->mpQmapNetDev[i];
++
++				if (!qmap_net)
++					break;
++
++				strcpy(pQmapDev->rmnet_info.ifname[i], qmap_net->name);
++			}
++			rc = copy_to_user(ifr->ifr_ifru.ifru_data, &pQmapDev->rmnet_info, sizeof(pQmapDev->rmnet_info));
++		}
++	break;
++
++#ifdef CONFIG_BRIDGE_LAN
++    case 0x89F4: //SIOCDEVPRIVATE
++        rc = copy_from_user(&brmac_settings, ifr->ifr_ifru.ifru_data, sizeof(brmac_settings));
++		if (pQmapDev->use_rmnet_usb && brmac_settings.id < qmap_mode) {
++		    struct net_device *qmap_net = pQmapDev->mpQmapNetDev[brmac_settings.id];
++		    struct qmap_priv *priv = netdev_priv(qmap_net);
++		    memcpy(priv->bridge_self_mac, brmac_settings.brmac, ETH_ALEN);
++		    pr_info("ioctl 0x89F4 change qmapnet bridge(%d) lan mac -> %02x:%02x:%02x:%02x:%02x:%02x\n", brmac_settings.id, priv->bridge_self_mac[0],
++                priv->bridge_self_mac[1], priv->bridge_self_mac[2], priv->bridge_self_mac[3], priv->bridge_self_mac[4], priv->bridge_self_mac[5]);
++		}
++		else if (!pQmapDev->use_rmnet_usb && brmac_settings.id == 0) {
++	        memcpy(pQmapDev->bridge_self_mac, brmac_settings.brmac, ETH_ALEN);
++	        pr_info("ioctl 0x89F4 change usbnet bridge(%d) lan mac -> %02x:%02x:%02x:%02x:%02x:%02x\n", brmac_settings.id, pQmapDev->bridge_self_mac[0],
++                pQmapDev->bridge_self_mac[1], pQmapDev->bridge_self_mac[2], pQmapDev->bridge_self_mac[3], pQmapDev->bridge_self_mac[4], pQmapDev->bridge_self_mac[5]);
++		}
++		else {
++		    pr_info("ioctl 0x89F4 change bridge(%d) lan mac -> error id\n", brmac_settings.id);
++		    rc = -1;
++		}
++	break;
++#endif
++#ifdef CONFIG_CLEAR_HALT
++    case 0x89F5: //SIOCDEVPRIVATE
++        rc = copy_from_user(&clear_halt, ifr->ifr_ifru.ifru_data, sizeof(clear_halt));
++        if (rc == 0 && clear_halt == 1) {
++            usb_clear_halt(usbnetdev->udev,usbnetdev->in);
++            usb_clear_halt(usbnetdev->udev,usbnetdev->out);
++            pr_info("usb_clear_halt EPIN EPOUT\n");
++        }
++    break;
++#endif
++
++	default:
++	break;
++	}
++
++	return rc;
++}
++
++#ifdef QUECTEL_BRIDGE_MODE
++static int is_qmap_netdev(const struct net_device *netdev) {
++	return netdev->netdev_ops == &rmnet_vnd_ops;
++}
++#endif
++#endif
++
++static struct sk_buff *qmi_wwan_tx_fixup(struct usbnet *dev, struct sk_buff *skb, gfp_t flags) {
++	//MDM9x07,MDM9628,MDM9x40,SDX20,SDX24 only work on RAW IP mode
++	if ((dev->driver_info->flags & FLAG_NOARP) == 0)
++		return skb;
++
++	// Skip Ethernet header from message
++	if (dev->net->hard_header_len == 0)
++		return skb;
++	else
++		skb_reset_mac_header(skb);
++
++#ifdef QUECTEL_BRIDGE_MODE
++{
++	struct qmi_wwan_state *info = (void *)&dev->data;
++	sQmiWwanQmap *pQmapDev = (sQmiWwanQmap *)info->unused;
++
++	if (pQmapDev->bridge_mode && bridge_mode_tx_fixup(dev->net, skb, pQmapDev->bridge_ipv4, pQmapDev->bridge_mac) == NULL) {
++	      dev_kfree_skb_any (skb);
++	      return NULL;
++	}
++}
++#endif
++
++	if (skb_pull(skb, ETH_HLEN)) {
++		return skb;
++	} else {
++		dev_err(&dev->intf->dev,  "Packet Dropped ");
++	}
++
++	// Filter the packet out, release it
++	dev_kfree_skb_any(skb);
++	return NULL;
++}
++#endif
++
++/* Make up an ethernet header if the packet doesn't have one.
++ *
++ * A firmware bug common among several devices cause them to send raw
++ * IP packets under some circumstances.  There is no way for the
++ * driver/host to know when this will happen.  And even when the bug
++ * hits, some packets will still arrive with an intact header.
++ *
++ * The supported devices are only capably of sending IPv4, IPv6 and
++ * ARP packets on a point-to-point link. Any packet with an ethernet
++ * header will have either our address or a broadcast/multicast
++ * address as destination.  ARP packets will always have a header.
++ *
++ * This means that this function will reliably add the appropriate
++ * header iff necessary, provided our hardware address does not start
++ * with 4 or 6.
++ *
++ * Another common firmware bug results in all packets being addressed
++ * to 00:a0:c6:00:00:00 despite the host address being different.
++ * This function will also fixup such packets.
++ */
++static int qmi_wwan_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
++{
++	__be16 proto;
++
++	/* This check is no longer done by usbnet */
++	if (skb->len < dev->net->hard_header_len)
++		return 0;
++
++	switch (skb->data[0] & 0xf0) {
++	case 0x40:
++		proto = htons(ETH_P_IP);
++		break;
++	case 0x60:
++		proto = htons(ETH_P_IPV6);
++		break;
++	case 0x00:
++		if (is_multicast_ether_addr(skb->data))
++			return 1;
++		/* possibly bogus destination - rewrite just in case */
++		skb_reset_mac_header(skb);
++		goto fix_dest;
++	default:
++		/* pass along other packets without modifications */
++		return 1;
++	}
++	if (skb_headroom(skb) < ETH_HLEN)
++		return 0;
++	skb_push(skb, ETH_HLEN);
++	skb_reset_mac_header(skb);
++	eth_hdr(skb)->h_proto = proto;
++	memset(eth_hdr(skb)->h_source, 0, ETH_ALEN);
++#if 1 //Added by Quectel
++	//some kernel will drop ethernet packet which's souce mac is all zero
++	memcpy(eth_hdr(skb)->h_source, default_modem_addr, ETH_ALEN);
++#endif
++
++fix_dest:
++#ifdef QUECTEL_BRIDGE_MODE
++{
++	struct qmi_wwan_state *info = (void *)&dev->data;
++	sQmiWwanQmap *pQmapDev = (sQmiWwanQmap *)info->unused;
++	bridge_mode_rx_fixup(pQmapDev, dev->net, skb);
++}
++#else
++	memcpy(eth_hdr(skb)->h_dest, dev->net->dev_addr, ETH_ALEN);
++#endif
++
++	return 1;
++}
++
++#if defined(QUECTEL_WWAN_QMAP)
++static struct sk_buff *qmap_qmi_wwan_tx_fixup(struct usbnet *dev, struct sk_buff *skb, gfp_t flags) {
++	struct qmi_wwan_state *info = (void *)&dev->data;
++	sQmiWwanQmap *pQmapDev = (sQmiWwanQmap *)info->unused;
++
++	if (unlikely(pQmapDev == NULL)) {
++		goto drop_skb;
++	} else if (unlikely(pQmapDev->qmap_mode && !pQmapDev->link_state)) {
++		dev_dbg(&dev->net->dev, "link_state 0x%x, drop skb, len = %u\n", pQmapDev->link_state, skb->len);
++		goto drop_skb;
++	} else if (pQmapDev->qmap_mode == 0) {
++		skb = qmi_wwan_tx_fixup(dev, skb, flags);
++	}
++	else if (pQmapDev->qmap_mode > 1) {
++		WARN_ON(1); //never reach here.
++	}
++	else {
++		if (likely(skb)) {
++			skb = qmi_wwan_tx_fixup(dev, skb, flags);
++
++			if (skb) {
++				if(pQmapDev->qmap_version == 5)
++					add_qhdr(skb, QUECTEL_QMAP_MUX_ID, NULL, 0);
++				else
++					add_qhdr_v5(skb, QUECTEL_QMAP_MUX_ID, NULL, 0);
++			}
++			else {
++				return NULL;
++			}
++		}
++	}
++
++	return skb;
++drop_skb:
++	dev_kfree_skb_any (skb);
++	return NULL;
++}
++
++static void qmap_packet_decode(sQmiWwanQmap *pQmapDev,
++	struct sk_buff *skb_in, struct sk_buff_head *skb_chain)
++{
++	struct device *dev = &pQmapDev->mpNetDev->net->dev;
++	struct sk_buff *qmap_skb;
++	uint dl_minimum_padding = 0;
++
++	if (pQmapDev->qmap_version == 9)
++		dl_minimum_padding = pQmapDev->tx_ctx.dl_minimum_padding;
++
++	/* __skb_queue_head_init() do not call spin_lock_init(&list->lock),
++	    so should not call skb_queue_tail/queue later.  */
++	__skb_queue_head_init(skb_chain);
++
++	while (skb_in->len > sizeof(struct qmap_hdr)) {
++		struct rmnet_map_header *map_header = (struct rmnet_map_header *)skb_in->data;
++		struct rmnet_map_v5_csum_header *ul_header = NULL;
++		size_t hdr_size = sizeof(struct rmnet_map_header);
++		struct net_device *qmap_net;
++		int pkt_len = ntohs(map_header->pkt_len);
++		int skb_len;
++		__be16 protocol;
++		int mux_id;
++		int skip_nss = 0;
++
++		if (map_header->next_hdr) {
++			ul_header = (struct rmnet_map_v5_csum_header *)(map_header + 1);
++			hdr_size += sizeof(struct rmnet_map_v5_csum_header);
++		}
++
++		skb_len = pkt_len - (map_header->pad_len&0x3F);
++		skb_len -= dl_minimum_padding;
++
++		mux_id = map_header->mux_id - QUECTEL_QMAP_MUX_ID;
++		if (mux_id >= pQmapDev->qmap_mode) {
++			dev_info(dev, "drop qmap unknow mux_id %x\n", map_header->mux_id);
++			goto error_pkt;
++		}
++
++		qmap_net = pQmapDev->mpQmapNetDev[mux_id];
++		if (qmap_net == NULL) {
++			dev_info(dev, "drop qmap unknow mux_id %x\n", map_header->mux_id);
++			goto skip_pkt;
++		}
++
++		if (skb_len > qmap_net->mtu) {
++			dev_info(dev, "drop skb_len=%x larger than mtu=%d\n", skb_len, qmap_net->mtu);
++			goto error_pkt;
++		}
++
++		if (skb_in->len < (pkt_len + hdr_size)) {
++			dev_info(dev, "drop qmap unknow pkt, len=%d, pkt_len=%d\n", skb_in->len, pkt_len);
++			goto error_pkt;
++		}
++
++		if (map_header->cd_bit) {
++			dev_info(dev, "skip qmap command packet\n");
++			goto skip_pkt;
++		}
++
++		switch (skb_in->data[hdr_size] & 0xf0) {
++			case 0x40:
++#ifdef CONFIG_QCA_NSS_PACKET_FILTER
++				{
++					struct iphdr *ip4h = (struct iphdr *)(&skb_in->data[hdr_size]);
++					if (ip4h->protocol == IPPROTO_ICMP) {
++						skip_nss = 1;
++					}
++				}
++#endif
++				protocol = htons(ETH_P_IP);
++			break;
++			case 0x60:
++#ifdef CONFIG_QCA_NSS_PACKET_FILTER
++				{
++					struct ipv6hdr *ip6h = (struct ipv6hdr *)(&skb_in->data[hdr_size]);
++					if (ip6h->nexthdr == NEXTHDR_ICMP) {
++						skip_nss = 1;
++					}
++				}
++#endif
++			protocol = htons(ETH_P_IPV6);
++			break;
++			default:
++				dev_info(dev, "unknow skb->protocol %02x\n", skb_in->data[hdr_size]);
++				goto error_pkt;
++		}
++
++		qmap_skb = netdev_alloc_skb(qmap_net, skb_len);
++		if (qmap_skb) {
++			skb_put(qmap_skb, skb_len);
++			memcpy(qmap_skb->data, skb_in->data + hdr_size, skb_len);
++		}
++
++		if (qmap_skb == NULL) {
++			dev_info(dev, "fail to alloc skb, pkt_len = %d\n", skb_len);
++			goto error_pkt;
++		}
++
++		skb_reset_transport_header(qmap_skb);
++		skb_reset_network_header(qmap_skb);
++		qmap_skb->pkt_type = PACKET_HOST;
++		skb_set_mac_header(qmap_skb, 0);
++		qmap_skb->protocol = protocol;
++
++		if(skip_nss)
++			qmap_skb->cb[0] = 1;
++
++		if (ul_header && ul_header->header_type == RMNET_MAP_HEADER_TYPE_CSUM_OFFLOAD
++			&& ul_header->csum_valid_required) {
++#if 0 //TODO
++			qmap_skb->ip_summed = CHECKSUM_UNNECESSARY;
++#endif
++		}
++
++		if (qmap_skb->dev->type == ARPHRD_ETHER) {
++			skb_push(qmap_skb, ETH_HLEN);
++			skb_reset_mac_header(qmap_skb);
++			memcpy(eth_hdr(qmap_skb)->h_source, default_modem_addr, ETH_ALEN);
++			memcpy(eth_hdr(qmap_skb)->h_dest, qmap_net->dev_addr, ETH_ALEN);
++			eth_hdr(qmap_skb)->h_proto = protocol;
++#ifdef QUECTEL_BRIDGE_MODE
++			bridge_mode_rx_fixup(pQmapDev, qmap_net, qmap_skb);
++#endif
++		}
++
++		__skb_queue_tail(skb_chain, qmap_skb);
++
++skip_pkt:
++		skb_pull(skb_in, pkt_len + hdr_size);
++	}
++
++error_pkt:
++	return;
++}
++
++static int qmap_qmi_wwan_rx_fixup(struct usbnet *dev, struct sk_buff *skb_in)
++{
++	struct qmi_wwan_state *info = (void *)&dev->data;
++	sQmiWwanQmap *pQmapDev = (sQmiWwanQmap *)info->unused;
++	struct sk_buff *qmap_skb;
++	struct sk_buff_head skb_chain;
++
++	if (pQmapDev->qmap_mode == 0)
++		return qmi_wwan_rx_fixup(dev, skb_in);
++
++	qmap_packet_decode(pQmapDev, skb_in, &skb_chain);
++
++	while ((qmap_skb = __skb_dequeue (&skb_chain))) {
++		if (qmap_skb->dev != dev->net) {
++			WARN_ON(1); //never reach here.
++		}
++		else {
++			qmap_skb->protocol = 0;
++			usbnet_skb_return(dev, qmap_skb);
++		}
++	}
++
++    return 0;
++}
++#endif
++
++/* very simplistic detection of IPv4 or IPv6 headers */
++static bool possibly_iphdr(const char *data)
++{
++	return (data[0] & 0xd0) == 0x40;
++}
++
++/* disallow addresses which may be confused with IP headers */
++static int qmi_wwan_mac_addr(struct net_device *dev, void *p)
++{
++	int ret;
++	struct sockaddr *addr = p;
++
++	ret = eth_prepare_mac_addr_change(dev, p);
++	if (ret < 0)
++		return ret;
++	if (possibly_iphdr(addr->sa_data))
++		return -EADDRNOTAVAIL;
++	eth_commit_mac_addr_change(dev, p);
++	return 0;
++}
++
++#if (LINUX_VERSION_CODE > KERNEL_VERSION( 4,10,0 )) //bc1f44709cf27fb2a5766cadafe7e2ad5e9cb221
++static void (*_usbnet_get_stats64)(struct net_device *net, struct rtnl_link_stats64 *stats);
++
++static void qmi_wwan_get_stats64(struct net_device *net, struct rtnl_link_stats64 *stats) {
++	if (_usbnet_get_stats64) ////c8b5d129ee293bcf972e7279ac996bb8a138505c
++		return _usbnet_get_stats64(net, stats);
++
++	netdev_stats_to_stats64(stats, &net->stats);
++}
++#else
++static struct rtnl_link_stats64 * (*_usbnet_get_stats64)(struct net_device *net, struct rtnl_link_stats64 *stats);
++
++static struct rtnl_link_stats64 * qmi_wwan_get_stats64(struct net_device *net, struct rtnl_link_stats64 *stats) {
++	if (_usbnet_get_stats64)
++		return _usbnet_get_stats64(net, stats);
++
++	netdev_stats_to_stats64(stats, &net->stats);
++	return stats;
++}
++#endif
++
++static int qmi_wwan_open (struct net_device *net) {
++	struct usbnet * usbnetdev = netdev_priv( net );
++	struct qmi_wwan_state *info = (void *)&usbnetdev->data;
++	sQmiWwanQmap *pQmapDev = (sQmiWwanQmap *)info->unused;
++	int retval;
++
++	retval = usbnet_open(net);
++
++	if (!retval) {
++		if (pQmapDev && pQmapDev->qmap_mode == 1) {
++			if (pQmapDev->link_state)
++				netif_carrier_on(net);
++		}
++	}
++
++	return retval;
++}
++
++static netdev_tx_t qmi_wwan_start_xmit (struct sk_buff *skb,
++				     struct net_device *net)
++{
++	struct usbnet * usbnetdev = netdev_priv( net );
++	struct qmi_wwan_state *info = (void *)&usbnetdev->data;
++	sQmiWwanQmap *pQmapDev = (sQmiWwanQmap *)info->unused;
++	int retval;
++
++	retval = usbnet_start_xmit(skb, net);
++
++	if (netif_queue_stopped(net) && pQmapDev && pQmapDev->use_rmnet_usb) {
++		int i;
++
++		for (i = 0; i < pQmapDev->qmap_mode; i++) {
++			struct net_device *qmap_net = pQmapDev->mpQmapNetDev[i];
++			if (qmap_net) {
++				netif_stop_queue(qmap_net);
++			}
++		}
++	}
++
++	return retval;
++}
++
++#if (LINUX_VERSION_CODE > KERNEL_VERSION( 5,14,0 )) //b9067f5dc4a07c8e24e01a1b277c6722d91be39e
++#define use_ndo_siocdevprivate
++#endif
++#ifdef use_ndo_siocdevprivate
++static int qmap_ndo_siocdevprivate(struct net_device *dev, struct ifreq *ifr, void __user *data, int cmd) {
++	return qmap_ndo_do_ioctl(dev, ifr, cmd);
++}
++#endif
++
++static const struct net_device_ops qmi_wwan_netdev_ops = {
++	.ndo_open		= qmi_wwan_open,
++	.ndo_stop		= usbnet_stop,
++	.ndo_start_xmit		= qmi_wwan_start_xmit,
++	.ndo_tx_timeout		= usbnet_tx_timeout,
++	.ndo_change_mtu		= usbnet_change_mtu,
++	.ndo_get_stats64	= qmi_wwan_get_stats64,
++	.ndo_set_mac_address	= qmi_wwan_mac_addr,
++	.ndo_validate_addr	= eth_validate_addr,
++#if defined(QUECTEL_WWAN_QMAP)// && defined(CONFIG_ANDROID)
++	.ndo_do_ioctl = qmap_ndo_do_ioctl,
++#ifdef use_ndo_siocdevprivate
++	.ndo_siocdevprivate = qmap_ndo_siocdevprivate,
++#endif
++#endif
++};
++
++static void ql_net_get_drvinfo(struct net_device *net, struct ethtool_drvinfo *info)
++{
++	/* Inherit standard device info */
++	usbnet_get_drvinfo(net, info);
++	strlcpy(info->driver, driver_name, sizeof(info->driver));
++	strlcpy(info->version, VERSION_NUMBER, sizeof(info->version));
++}
++
++static struct ethtool_ops ql_net_ethtool_ops;
++
++/* using a counter to merge subdriver requests with our own into a
++ * combined state
++ */
++static int qmi_wwan_manage_power(struct usbnet *dev, int on)
++{
++	struct qmi_wwan_state *info = (void *)&dev->data;
++	int rv;
++
++	dev_dbg(&dev->intf->dev, "%s() pmcount=%d, on=%d\n", __func__,
++		atomic_read(&info->pmcount), on);
++
++	if ((on && atomic_add_return(1, &info->pmcount) == 1) ||
++	    (!on && atomic_dec_and_test(&info->pmcount))) {
++		/* need autopm_get/put here to ensure the usbcore sees
++		 * the new value
++		 */
++		rv = usb_autopm_get_interface(dev->intf);
++		dev->intf->needs_remote_wakeup = on;
++		if (!rv)
++			usb_autopm_put_interface(dev->intf);
++	}
++	return 0;
++}
++
++static int qmi_wwan_cdc_wdm_manage_power(struct usb_interface *intf, int on)
++{
++	struct usbnet *dev = usb_get_intfdata(intf);
++
++	/* can be called while disconnecting */
++	if (!dev)
++		return 0;
++	return qmi_wwan_manage_power(dev, on);
++}
++
++/* collect all three endpoints and register subdriver */
++static int qmi_wwan_register_subdriver(struct usbnet *dev)
++{
++	int rv;
++	struct usb_driver *subdriver = NULL;
++	struct qmi_wwan_state *info = (void *)&dev->data;
++
++	/* collect bulk endpoints */
++	rv = usbnet_get_endpoints(dev, info->data);
++	if (rv < 0)
++		goto err;
++
++	/* update status endpoint if separate control interface */
++	if (info->control != info->data)
++		dev->status = &info->control->cur_altsetting->endpoint[0];
++
++	/* require interrupt endpoint for subdriver */
++	if (!dev->status) {
++		rv = -EINVAL;
++		goto err;
++	}
++
++	/* for subdriver power management */
++	atomic_set(&info->pmcount, 0);
++
++	/* register subdriver */
++#if (LINUX_VERSION_CODE > KERNEL_VERSION( 5,12,0 )) //cac6fb015f719104e60b1c68c15ca5b734f57b9c
++	subdriver = usb_cdc_wdm_register(info->control, &dev->status->desc,
++					 4096, WWAN_PORT_QMI, &qmi_wwan_cdc_wdm_manage_power);
++#else
++	subdriver = usb_cdc_wdm_register(info->control, &dev->status->desc,
++					 4096, &qmi_wwan_cdc_wdm_manage_power);
++
++#endif
++	if (IS_ERR(subdriver)) {
++		dev_err(&info->control->dev, "subdriver registration failed\n");
++		rv = PTR_ERR(subdriver);
++		goto err;
++	}
++
++	/* prevent usbnet from using status endpoint */
++	dev->status = NULL;
++
++	/* save subdriver struct for suspend/resume wrappers */
++	info->subdriver = subdriver;
++
++err:
++	return rv;
++}
++
++static int qmi_wwan_bind(struct usbnet *dev, struct usb_interface *intf)
++{
++	int status = -1;
++	struct usb_driver *driver = driver_of(intf);
++	struct qmi_wwan_state *info = (void *)&dev->data;
++
++	BUILD_BUG_ON((sizeof(((struct usbnet *)0)->data) <
++		      sizeof(struct qmi_wwan_state)));
++
++	/* set up initial state */
++	info->control = intf;
++	info->data = intf;
++
++	status = qmi_wwan_register_subdriver(dev);
++	if (status < 0 && info->control != info->data) {
++		usb_set_intfdata(info->data, NULL);
++		usb_driver_release_interface(driver, info->data);
++	}
++
++	/* Never use the same address on both ends of the link, even
++	 * if the buggy firmware told us to.
++	 */
++	if (ether_addr_equal(dev->net->dev_addr, default_modem_addr))
++		eth_hw_addr_random(dev->net);
++
++	/* make MAC addr easily distinguishable from an IP header */
++	if (possibly_iphdr(dev->net->dev_addr)) {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,17,0)
++		u8 temp_addr[ETH_ALEN];
++		memcpy(temp_addr, dev->net->dev_addr, ETH_ALEN);
++		temp_addr[0] |= 0x02;	/* set local assignment bit */
++		temp_addr[0] &= 0xbf;	/* clear "IP" bit */
++		__dev_addr_set(dev->net, temp_addr, ETH_ALEN);
++#else
++		dev->net->dev_addr[0] |= 0x02;	/* set local assignment bit */
++		dev->net->dev_addr[0] &= 0xbf;	/* clear "IP" bit */
++#endif
++		}
++	if (!_usbnet_get_stats64)
++		_usbnet_get_stats64 = dev->net->netdev_ops->ndo_get_stats64;
++	dev->net->netdev_ops = &qmi_wwan_netdev_ops;
++
++	ql_net_ethtool_ops = *dev->net->ethtool_ops;
++	ql_net_ethtool_ops.get_drvinfo = ql_net_get_drvinfo;
++	dev->net->ethtool_ops = &ql_net_ethtool_ops;
++
++#if 1 //Added by Quectel
++	if (dev->driver_info->flags & FLAG_NOARP) {
++		int ret;
++		char buf[32] = "Module";
++
++		ret = usb_string(dev->udev, dev->udev->descriptor.iProduct, buf, sizeof(buf));
++		if (ret > 0) {
++			buf[ret] = '\0';
++		}
++
++		dev_info(&intf->dev, "Quectel %s work on RawIP mode\n", buf);
++		dev->net->flags |= IFF_NOARP;
++		dev->net->flags &= ~(IFF_BROADCAST | IFF_MULTICAST);
++
++		usb_control_msg(
++			interface_to_usbdev(intf),
++			usb_sndctrlpipe(interface_to_usbdev(intf), 0),
++			0x22, //USB_CDC_REQ_SET_CONTROL_LINE_STATE
++			0x21, //USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE
++			1, //active CDC DTR
++			intf->cur_altsetting->desc.bInterfaceNumber,
++			NULL, 0, 100);
++	}
++
++	usb_clear_halt(dev->udev,dev->in);
++	usb_clear_halt(dev->udev,dev->out);
++
++	//to advoid module report mtu 1460, but rx 1500 bytes IP packets, and cause the customer's system crash
++	//next setting can make usbnet.c:usbnet_change_mtu() do not modify rx_urb_size according to hard mtu
++	dev->rx_urb_size = ETH_DATA_LEN + ETH_HLEN + 6;
++
++#if defined(QUECTEL_WWAN_QMAP)
++	if (qmap_mode > QUECTEL_WWAN_QMAP)
++		qmap_mode = QUECTEL_WWAN_QMAP;
++
++	if (!status)
++	{
++		sQmiWwanQmap *pQmapDev = (sQmiWwanQmap *)kzalloc(sizeof(sQmiWwanQmap), GFP_KERNEL);
++
++		if (pQmapDev == NULL)
++			return -ENODEV;
++
++#ifdef QUECTEL_BRIDGE_MODE
++		pQmapDev->bridge_mode = bridge_mode;
++#ifdef CONFIG_BRIDGE_LAN
++        memcpy(pQmapDev->bridge_self_mac, broadcast_mac_addr, ETH_ALEN);
++#endif
++#endif
++		pQmapDev->mpNetDev = dev;
++		pQmapDev->link_state = 1;
++		//on OpenWrt, if set rmnet_usb0.1 as WAN, '/sbin/netifd' will auto create VLAN for rmnet_usb0
++		dev->net->features |= (NETIF_F_VLAN_CHALLENGED);
++
++		if (dev->driver_info->flags & FLAG_NOARP)
++		{
++			int qmap_version = (dev->driver_info->data>>8)&0xFF;
++			int qmap_size = (dev->driver_info->data)&0xFF;
++			int idProduct = le16_to_cpu(dev->udev->descriptor.idProduct);
++			int lte_a = (idProduct == 0x0306 || idProduct == 0x030B || idProduct == 0x0512 || idProduct == 0x0620 ||
++							idProduct == 0x0800 || idProduct == 0x0801 || idProduct == 0x0122);
++
++			if (qmap_size > 4096 || dev->udev->speed >= USB_SPEED_SUPER) { //if meet this requirements, must be LTE-A or 5G
++				lte_a = 1;
++			}
++
++			pQmapDev->qmap_mode = qmap_mode;
++			if (lte_a && pQmapDev->qmap_mode == 0) {
++				pQmapDev->qmap_mode = 1; //force use QMAP
++				if(qmap_mode == 0)
++					qmap_mode = 1; //old quectel-CM only check sys/module/wwan0/parameters/qmap_mode
++			}
++
++			if (pQmapDev->qmap_mode) {
++				pQmapDev->qmap_version = qmap_version;
++				pQmapDev->qmap_size = qmap_size*1024;
++				dev->rx_urb_size = pQmapDev->qmap_size;
++				//for these modules, if send packet before qmi_start_network, or cause host PC crash, or cause modules crash
++   				pQmapDev->link_state = !lte_a;
++
++				if (pQmapDev->qmap_mode > 1)
++					pQmapDev->use_rmnet_usb = 1;
++				else if (idProduct == 0x0800 || idProduct == 0x0801 || idProduct == 0x0122)
++					pQmapDev->use_rmnet_usb = 1; //benefit for ul data agg
++#ifdef QMI_NETDEV_ONE_CARD_MODE
++				if(pQmapDev->use_rmnet_usb == 1 && pQmapDev->qmap_mode == 1)
++					one_card_mode = 1;
++				pQmapDev->rmnet_info.mux_id[0] = QUECTEL_QMAP_MUX_ID;
++#endif
++				pQmapDev->rmnet_info.size = sizeof(RMNET_INFO);
++				pQmapDev->rmnet_info.rx_urb_size = pQmapDev->qmap_size;
++				pQmapDev->rmnet_info.ep_type = 2; //DATA_EP_TYPE_HSUSB
++				pQmapDev->rmnet_info.iface_id = 4;
++				pQmapDev->rmnet_info.qmap_mode = pQmapDev->qmap_mode;
++				pQmapDev->rmnet_info.qmap_version = pQmapDev->qmap_version;
++				pQmapDev->rmnet_info.dl_minimum_padding = 0;
++
++#if defined(QUECTEL_UL_DATA_AGG)
++				pQmapDev->tx_ctx.ul_data_aggregation_max_datagrams = 1;
++				pQmapDev->tx_ctx.ul_data_aggregation_max_size = 1500;
++#endif
++
++				if (pQmapDev->use_rmnet_usb && !one_card_mode) {
++					pQmapDev->driver_info = rmnet_usb_info;
++					pQmapDev->driver_info.data = dev->driver_info->data;
++					dev->driver_info = &pQmapDev->driver_info;
++				}
++
++				if (pQmapDev->use_rmnet_usb && !one_card_mode) {
++					pQmapDev->usbnet_bh = dev->bh;
++					tasklet_init(&dev->bh, usbnet_bh, (unsigned long)pQmapDev);
++				}
++			}
++		}
++
++		info->unused = (unsigned long)pQmapDev;
++		dev->net->sysfs_groups[0] = &qmi_wwan_sysfs_attr_group;
++
++		dev_info(&intf->dev, "rx_urb_size = %zd\n", dev->rx_urb_size);
++	}
++#endif
++#endif
++
++	return status;
++}
++
++static void qmi_wwan_unbind(struct usbnet *dev, struct usb_interface *intf)
++{
++	struct qmi_wwan_state *info = (void *)&dev->data;
++	struct usb_driver *driver = driver_of(intf);
++	struct usb_interface *other;
++
++	if (dev->udev && dev->udev->state == USB_STATE_CONFIGURED) {
++		usb_control_msg(
++			interface_to_usbdev(intf),
++			usb_sndctrlpipe(interface_to_usbdev(intf), 0),
++			0x22, //USB_CDC_REQ_SET_CONTROL_LINE_STATE
++			0x21, //USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE
++			0, //deactive CDC DTR
++			intf->cur_altsetting->desc.bInterfaceNumber,
++			NULL, 0, 100);
++	}
++
++	if (info->subdriver && info->subdriver->disconnect)
++		info->subdriver->disconnect(info->control);
++
++	/* allow user to unbind using either control or data */
++	if (intf == info->control)
++		other = info->data;
++	else
++		other = info->control;
++
++	/* only if not shared */
++	if (other && intf != other) {
++		usb_set_intfdata(other, NULL);
++		usb_driver_release_interface(driver, other);
++	}
++
++	info->subdriver = NULL;
++	info->data = NULL;
++	info->control = NULL;
++}
++
++/* suspend/resume wrappers calling both usbnet and the cdc-wdm
++ * subdriver if present.
++ *
++ * NOTE: cdc-wdm also supports pre/post_reset, but we cannot provide
++ * wrappers for those without adding usbnet reset support first.
++ */
++static int qmi_wwan_suspend(struct usb_interface *intf, pm_message_t message)
++{
++	struct usbnet *dev = usb_get_intfdata(intf);
++	struct qmi_wwan_state *info = (void *)&dev->data;
++	int ret;
++
++	/* Both usbnet_suspend() and subdriver->suspend() MUST return 0
++	 * in system sleep context, otherwise, the resume callback has
++	 * to recover device from previous suspend failure.
++	 */
++	ret = usbnet_suspend(intf, message);
++	if (ret < 0)
++		goto err;
++
++	if (intf == info->control && info->subdriver &&
++	    info->subdriver->suspend)
++		ret = info->subdriver->suspend(intf, message);
++	if (ret < 0)
++		usbnet_resume(intf);
++err:
++	return ret;
++}
++
++static int qmi_wwan_resume(struct usb_interface *intf)
++{
++	struct usbnet *dev = usb_get_intfdata(intf);
++	struct qmi_wwan_state *info = (void *)&dev->data;
++	int ret = 0;
++	bool callsub = (intf == info->control && info->subdriver &&
++			info->subdriver->resume);
++
++	if (callsub)
++		ret = info->subdriver->resume(intf);
++	if (ret < 0)
++		goto err;
++	ret = usbnet_resume(intf);
++	if (ret < 0 && callsub)
++		info->subdriver->suspend(intf, PMSG_SUSPEND);
++
++#if defined(QUECTEL_WWAN_QMAP)
++	if (!netif_queue_stopped(dev->net)) {
++		qmap_wake_queue((sQmiWwanQmap *)info->unused);
++	}
++#endif
++
++err:
++	return ret;
++}
++
++static int qmi_wwan_reset_resume(struct usb_interface *intf)
++{
++	dev_info(&intf->dev, "device do not support reset_resume\n");
++	intf->needs_binding = 1;
++	return -EOPNOTSUPP;
++}
++
++static struct sk_buff *rmnet_usb_tx_fixup(struct usbnet *dev, struct sk_buff *skb, gfp_t flags)
++{
++	//printk("%s skb=%p, len=%d, protocol=%x, hdr_len=%d\n", __func__, skb, skb->len, skb->protocol, skb->hdr_len);
++	if (skb->protocol != htons(ETH_P_MAP)) {
++		dev_kfree_skb_any(skb);
++		return NULL;
++	}
++
++	return skb;
++}
++
++static int rmnet_usb_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
++{
++	struct net_device	*net = dev->net;
++	unsigned headroom = skb_headroom(skb);
++
++#if (LINUX_VERSION_CODE < KERNEL_VERSION( 3,3,1 )) //7bdd402706cf26bfef9050dfee3f229b7f33ee4f
++//some customers port to v3.2
++	if (net->type == ARPHRD_ETHER && headroom < ETH_HLEN) {
++		unsigned tailroom = skb_tailroom(skb);
++
++		if ((tailroom + headroom) >= ETH_HLEN) {
++			unsigned moveroom = ETH_HLEN - headroom;
++
++			memmove(skb->data + moveroom ,skb->data, skb->len);
++			skb->data += moveroom;
++			skb->tail += moveroom;
++			#ifdef WARN_ONCE
++			WARN_ONCE(1, "It is better reserve headroom in usbnet.c:rx_submit()!\n");
++			#endif
++		}
++	}
++#endif
++
++	//printk("%s skb=%p, len=%d, protocol=%x, hdr_len=%d\n", __func__, skb, skb->len, skb->protocol, skb->hdr_len);
++	if (net->type == ARPHRD_ETHER && headroom >= ETH_HLEN) {
++		//usbnet.c rx_process() usbnet_skb_return() eth_type_trans()
++		skb_push(skb, ETH_HLEN);
++		skb_reset_mac_header(skb);
++		memcpy(eth_hdr(skb)->h_source, default_modem_addr, ETH_ALEN);
++		memcpy(eth_hdr(skb)->h_dest, net->dev_addr, ETH_ALEN);
++		eth_hdr(skb)->h_proto = htons(ETH_P_MAP);
++
++		return 1;
++	}
++
++	return 0;
++}
++
++static rx_handler_result_t rmnet_usb_rx_handler(struct sk_buff **pskb)
++{
++	struct sk_buff *skb = *pskb;
++	struct usbnet *dev;
++	struct qmi_wwan_state *info;
++	sQmiWwanQmap *pQmapDev;
++	struct sk_buff *qmap_skb;
++	struct sk_buff_head skb_chain;
++
++	if (!skb)
++		goto done;
++
++	//printk("%s skb=%p, protocol=%x, len=%d\n", __func__, skb, skb->protocol, skb->len);
++
++	if (skb->pkt_type == PACKET_LOOPBACK)
++		return RX_HANDLER_PASS;
++
++	if (skb->protocol != htons(ETH_P_MAP)) {
++		WARN_ON(1);
++		return RX_HANDLER_PASS;
++	}
++    /* when open hyfi function, run cm will make system crash */
++	//dev = rcu_dereference(skb->dev->rx_handler_data);
++	dev = netdev_priv(skb->dev);
++
++	if (dev == NULL) {
++		WARN_ON(1);
++		return RX_HANDLER_PASS;
++	}
++
++	info = (struct qmi_wwan_state *)&dev->data;
++	pQmapDev = (sQmiWwanQmap *)info->unused;
++
++	qmap_packet_decode(pQmapDev, skb, &skb_chain);
++	while ((qmap_skb = __skb_dequeue (&skb_chain))) {
++		struct net_device	*qmap_net = qmap_skb->dev;
++
++		rmnet_vnd_update_rx_stats(qmap_net, 1, qmap_skb->len);
++		if (qmap_net->type == ARPHRD_ETHER)
++			__skb_pull(qmap_skb, ETH_HLEN);
++		netif_receive_skb(qmap_skb);
++	}
++	consume_skb(skb);
++
++done:
++	return RX_HANDLER_CONSUMED;
++}
++
++static const struct driver_info	qmi_wwan_info = {
++	.description	= "WWAN/QMI device",
++	.flags		= FLAG_WWAN,
++	.bind		= qmi_wwan_bind,
++	.unbind		= qmi_wwan_unbind,
++	.manage_power	= qmi_wwan_manage_power,
++};
++
++#define qmi_wwan_raw_ip_info \
++	.description	= "WWAN/QMI Raw IP device", \
++	.flags		= FLAG_WWAN | FLAG_RX_ASSEMBLE | FLAG_NOARP | FLAG_SEND_ZLP, \
++	.bind		= qmi_wwan_bind, \
++	.unbind		= qmi_wwan_unbind, \
++	.manage_power	= qmi_wwan_manage_power, \
++	.tx_fixup       = qmap_qmi_wwan_tx_fixup, \
++	.rx_fixup       = qmap_qmi_wwan_rx_fixup, \
++
++static const struct driver_info rmnet_usb_info = {
++	.description = "RMNET/USB device",
++	.flags		=  FLAG_WWAN | FLAG_NOARP | FLAG_SEND_ZLP,
++	.bind = qmi_wwan_bind,
++	.unbind = qmi_wwan_unbind,
++	.manage_power = qmi_wwan_manage_power,
++	.tx_fixup = rmnet_usb_tx_fixup,
++	.rx_fixup = rmnet_usb_rx_fixup,
++};
++
++static const struct driver_info qmi_wwan_raw_ip_info_mdm9x07 = {
++	qmi_wwan_raw_ip_info
++	.data = (5<<8)|4, //QMAPV1 and 4KB
++};
++
++// mdm9x40/sdx12/sdx20/sdx24 share the same config
++static const struct driver_info qmi_wwan_raw_ip_info_mdm9x40 = {
++	qmi_wwan_raw_ip_info
++	.data =  (5<<8)|16, //QMAPV1 and 16KB
++};
++
++static const struct driver_info qmi_wwan_raw_ip_info_sdx55 = {
++	qmi_wwan_raw_ip_info
++	.data = (9<<8)|31, //QMAPV5 and 31KB
++};
++
++/* map QMI/wwan function by a fixed interface number */
++#define QMI_FIXED_INTF(vend, prod, num) \
++	USB_DEVICE_INTERFACE_NUMBER(vend, prod, num), \
++	.driver_info = (unsigned long)&qmi_wwan_info
++
++#define QMI_FIXED_RAWIP_INTF(vend, prod, num, chip) \
++	USB_DEVICE_INTERFACE_NUMBER(vend, prod, num), \
++	.driver_info = (unsigned long)&qmi_wwan_raw_ip_info_##chip
++
++static const struct usb_device_id products[] = {
++	{ QMI_FIXED_INTF(0x05C6, 0x9003, 4) },  /* Quectel UC20 */
++	{ QMI_FIXED_INTF(0x05C6, 0x9215, 4) },  /* Quectel EC20 (MDM9215) */
++	{ QMI_FIXED_RAWIP_INTF(0x2C7C, 0x0125, 4, mdm9x07) },  /* Quectel EC20 (MDM9X07)/EC25/EG25 */
++	{ QMI_FIXED_RAWIP_INTF(0x2C7C, 0x0121, 4, mdm9x07) },  /* Quectel EC21 */
++	{ QMI_FIXED_RAWIP_INTF(0x2C7C, 0x030E, 4, mdm9x07) },  /* Quectel EM05G */
++	{ QMI_FIXED_RAWIP_INTF(0x2C7C, 0x0191, 4, mdm9x07) },  /* Quectel EG91 */
++	{ QMI_FIXED_RAWIP_INTF(0x2C7C, 0x0195, 4, mdm9x07) },  /* Quectel EG95 */
++	{ QMI_FIXED_RAWIP_INTF(0x2C7C, 0x0700, 3, mdm9x07) },  /* Quectel BG95 (at+qcfgext="usbnet","rmnet") */
++	{ QMI_FIXED_RAWIP_INTF(0x2C7C, 0x0306, 4, mdm9x40) },  /* Quectel EG06/EP06/EM06 */
++	{ QMI_FIXED_RAWIP_INTF(0x2C7C, 0x030B, 4, mdm9x40) },  /* Quectel EG065k/EG060K */
++	{ QMI_FIXED_RAWIP_INTF(0x2C7C, 0x0512, 4, mdm9x40) },  /* Quectel EG12/EP12/EM12/EG16/EG18 */
++	{ QMI_FIXED_RAWIP_INTF(0x2C7C, 0x0296, 4, mdm9x07) },  /* Quectel BG96 */
++	{ QMI_FIXED_RAWIP_INTF(0x2C7C, 0x0435, 4, mdm9x07) },  /* Quectel AG35 */
++	{ QMI_FIXED_RAWIP_INTF(0x2C7C, 0x0620, 4, mdm9x40) },  /* Quectel EG20 */
++	{ QMI_FIXED_RAWIP_INTF(0x2C7C, 0x0800, 4, sdx55) },  /* Quectel RG500 */
++	{ QMI_FIXED_RAWIP_INTF(0x2C7C, 0x0801, 4, sdx55) },  /* Quectel RG520 */
++	{ QMI_FIXED_RAWIP_INTF(0x2C7C, 0x0122, 4, sdx55) },  /* Quectel RG650 */
++	{ }					/* END */
++};
++MODULE_DEVICE_TABLE(usb, products);
++
++static int qmi_wwan_probe(struct usb_interface *intf,
++			  const struct usb_device_id *prod)
++{
++	struct usb_device_id *id = (struct usb_device_id *)prod;
++
++	/* Workaround to enable dynamic IDs.  This disables usbnet
++	 * blacklisting functionality.  Which, if required, can be
++	 * reimplemented here by using a magic "blacklist" value
++	 * instead of 0 in the static device id table
++	 */
++	if (!id->driver_info) {
++		dev_dbg(&intf->dev, "setting defaults for dynamic device id\n");
++		id->driver_info = (unsigned long)&qmi_wwan_info;
++	}
++
++	if (intf->cur_altsetting->desc.bInterfaceClass != 0xff) {
++		dev_info(&intf->dev,  "Quectel module not qmi_wwan mode! please check 'at+qcfg=\"usbnet\"'\n");
++		return -ENODEV;
++	}
++
++	return usbnet_probe(intf, id);
++}
++
++#if defined(QUECTEL_WWAN_QMAP)
++static int qmap_qmi_wwan_probe(struct usb_interface *intf,
++			  const struct usb_device_id *prod)
++{
++	int status = qmi_wwan_probe(intf, prod);
++
++	if (!status) {
++		struct usbnet *dev = usb_get_intfdata(intf);
++		struct qmi_wwan_state *info = (void *)&dev->data;
++		sQmiWwanQmap *pQmapDev = (sQmiWwanQmap *)info->unused;
++		unsigned i;
++
++		if (!pQmapDev)
++			return status;
++
++		tasklet_init(&pQmapDev->txq, rmnet_usb_tx_wake_queue, (unsigned long)pQmapDev);
++
++		if (pQmapDev->qmap_mode == 1) {
++			pQmapDev->mpQmapNetDev[0] = dev->net;
++			if (pQmapDev->use_rmnet_usb && !one_card_mode) {
++				pQmapDev->mpQmapNetDev[0] = NULL;
++				qmap_register_device(pQmapDev, 0);
++			}
++		}
++		else if (pQmapDev->qmap_mode > 1) {
++			for (i = 0; i < pQmapDev->qmap_mode; i++) {
++				qmap_register_device(pQmapDev, i);
++			}
++		}
++
++		if (pQmapDev->use_rmnet_usb && !one_card_mode) {
++			rtnl_lock();
++			/* when open hyfi function, run cm will make system crash */
++			//netdev_rx_handler_register(dev->net, rmnet_usb_rx_handler, dev);
++			netdev_rx_handler_register(dev->net, rmnet_usb_rx_handler, NULL);
++			rtnl_unlock();
++		}
++
++		if (pQmapDev->link_state == 0) {
++			netif_carrier_off(dev->net);
++		}
++	}
++
++	return status;
++}
++
++static void qmap_qmi_wwan_disconnect(struct usb_interface *intf)
++{
++	struct usbnet *dev = usb_get_intfdata(intf);
++	struct qmi_wwan_state *info;
++	sQmiWwanQmap *pQmapDev;
++	uint i;
++
++	if (!dev)
++		return;
++
++	info = (void *)&dev->data;
++	pQmapDev = (sQmiWwanQmap *)info->unused;
++
++	if (!pQmapDev) {
++		return usbnet_disconnect(intf);
++	}
++
++	pQmapDev->link_state = 0;
++
++	if (pQmapDev->qmap_mode > 1) {
++		for (i = 0; i < pQmapDev->qmap_mode; i++) {
++			qmap_unregister_device(pQmapDev, i);
++		}
++	}
++
++	if (pQmapDev->use_rmnet_usb && !one_card_mode) {
++		qmap_unregister_device(pQmapDev, 0);
++		rtnl_lock();
++		netdev_rx_handler_unregister(dev->net);
++		rtnl_unlock();
++	}
++
++	tasklet_kill(&pQmapDev->txq);
++
++	usbnet_disconnect(intf);
++	/* struct usbnet *dev had free by usbnet_disconnect()->free_netdev().
++	    so we should access info. */
++	//info->unused = 0;
++	kfree(pQmapDev);
++}
++#endif
++
++static struct usb_driver qmi_wwan_driver = {
++	.name		      = "qmi_wwan_q",
++	.id_table	      = products,
++	.probe		      = qmi_wwan_probe,
++#if defined(QUECTEL_WWAN_QMAP)
++	.probe		      = qmap_qmi_wwan_probe,
++	.disconnect	      = qmap_qmi_wwan_disconnect,
++#else
++	.probe		      = qmi_wwan_probe,
++	.disconnect	      = usbnet_disconnect,
++#endif
++	.suspend	      = qmi_wwan_suspend,
++	.resume		      =	qmi_wwan_resume,
++	.reset_resume         = qmi_wwan_reset_resume,
++	.supports_autosuspend = 1,
++	.disable_hub_initiated_lpm = 1,
++};
++
++static int __init qmi_wwan_driver_init(void)
++{
++#ifdef CONFIG_QCA_NSS_DRV
++	nss_cb = rcu_dereference(rmnet_nss_callbacks);
++	if (!nss_cb) {
++		printk(KERN_ERR "qmi_wwan_driver_init: driver load must after '/etc/modules.d/42-rmnet-nss'\n");
++	}
++#endif
++	return usb_register(&qmi_wwan_driver);
++}
++module_init(qmi_wwan_driver_init);
++static void __exit qmi_wwan_driver_exit(void)
++{
++	usb_deregister(&qmi_wwan_driver);
++}
++module_exit(qmi_wwan_driver_exit);
++
++MODULE_AUTHOR("Bjørn Mork <bjorn@mork.no>");
++MODULE_DESCRIPTION("Qualcomm MSM Interface (QMI) WWAN driver");
++MODULE_LICENSE("GPL");
++MODULE_VERSION(QUECTEL_WWAN_VERSION);
+diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
+index 3a8350cad812..3af8eae5bb1d 100644
+--- a/drivers/pci/controller/dwc/pci-imx6.c
++++ b/drivers/pci/controller/dwc/pci-imx6.c
+@@ -75,6 +75,7 @@
+ #define IMX8MP_GPR_PCIE_REF_EXT_OSC		BIT(25)
+ 
+ #define to_imx6_pcie(x)	dev_get_drvdata((x)->dev)
++#define FOR_QUALCOMM_WIFI_MODULE
+ 
+ enum imx6_pcie_variants {
+ 	IMX6Q,
+@@ -1176,7 +1177,8 @@ static void imx6_pcie_deassert_core_reset(struct imx6_pcie *imx6_pcie)
+ 		imx6_pcie_clk_enable(imx6_pcie);
+ 		break;
+ 	}
+-
++#ifdef FOR_QUALCOMM_WIFI_MODULE
++#else
+ 	/* Some boards don't have PCIe reset GPIO. */
+ 	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
+ 		gpio_set_value_cansleep(imx6_pcie->reset_gpio,
+@@ -1185,7 +1187,7 @@ static void imx6_pcie_deassert_core_reset(struct imx6_pcie *imx6_pcie)
+ 		gpio_set_value_cansleep(imx6_pcie->reset_gpio,
+ 					!imx6_pcie->gpio_active_high);
+ 	}
+-
++#endif
+ 	switch (imx6_pcie->drvdata->variant) {
+ 	case IMX8QM:
+ 	case IMX8QM_EP:
+@@ -2429,6 +2431,8 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+ 	imx6_pcie->epdev_on = devm_regulator_get(&pdev->dev, "epdev_on");
+ 	if (IS_ERR(imx6_pcie->epdev_on))
+ 		return -EPROBE_DEFER;
++#ifdef FOR_QUALCOMM_WIFI_MODULE
++#else
+ 	imx6_pcie->reset_gpio = of_get_named_gpio(node, "reset-gpio", 0);
+ 	imx6_pcie->gpio_active_high = of_property_read_bool(node,
+ 						"reset-gpio-active-high");
+@@ -2445,7 +2449,7 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+ 	} else if (imx6_pcie->reset_gpio == -EPROBE_DEFER) {
+ 		return imx6_pcie->reset_gpio;
+ 	}
+-
++#endif
+ 	/* Fetch clocks */
+ 	imx6_pcie->pcie_phy = devm_clk_get(dev, "pcie_phy");
+ 	if (IS_ERR(imx6_pcie->pcie_phy))
+@@ -2658,6 +2662,34 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+ 	imx6_pcie_deassert_core_reset(imx6_pcie);
+ 	imx6_setup_phy_mpll(imx6_pcie);
+ 
++#ifdef FOR_QUALCOMM_WIFI_MODULE
++	pr_info("### For Qualcomm WIFI module...### \n");
++	msleep(1);
++	imx6_pcie->reset_gpio = of_get_named_gpio(node, "reset-gpio", 0);
++	imx6_pcie->gpio_active_high = of_property_read_bool(node,
++						"reset-gpio-active-high");
++	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
++		ret = devm_gpio_request_one(dev, imx6_pcie->reset_gpio,
++				imx6_pcie->gpio_active_high ?
++					GPIOF_OUT_INIT_HIGH :
++					GPIOF_OUT_INIT_LOW,
++				"PCIe reset");
++		if (ret) {
++			dev_err(dev, "unable to get reset gpio\n");
++			return ret;
++		}
++	} else if (imx6_pcie->reset_gpio == -EPROBE_DEFER) {
++		return imx6_pcie->reset_gpio;
++	}
++	/* Some boards don't have PCIe reset GPIO. */
++	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
++		gpio_set_value_cansleep(imx6_pcie->reset_gpio,
++					imx6_pcie->gpio_active_high);
++		msleep(20);
++		gpio_set_value_cansleep(imx6_pcie->reset_gpio,
++					!imx6_pcie->gpio_active_high);
++	}
++#endif
+ 	switch (imx6_pcie->drvdata->mode) {
+ 	case DW_PCIE_RC_TYPE:
+ 		/* add attributes for bus freq */
+diff --git a/drivers/usb/serial/option.c b/drivers/usb/serial/option.c
+index 697683e3fbff..f7993fc509c5 100644
+--- a/drivers/usb/serial/option.c
++++ b/drivers/usb/serial/option.c
+@@ -601,6 +601,22 @@ static void option_instat_callback(struct urb *urb);
+ 
+ 
+ static const struct usb_device_id option_ids[] = {
++#if 1 //Added by Quectel
++	{ USB_DEVICE(0x2C7C, 0x0125) }, /* Quectel EC20 R2.0/EC20 R2.1/EC25/EG25-G/EM05 */
++	{ USB_DEVICE(0x2C7C, 0x0121) }, /* Quectel EC21/EG21-G */
++	{ USB_DEVICE(0x2C7C, 0x0191) }, /* Quectel EG91 */
++	{ USB_DEVICE(0x2C7C, 0x0195) }, /* Quectel EG95 */
++	{ USB_DEVICE(0x2C7C, 0x0306) }, /* Quectel EG06/EP06/EM06 */
++	{ USB_DEVICE(0x2C7C, 0x0512) }, /* Quectel EG12/EM12/EG18 */
++	{ USB_DEVICE(0x2C7C, 0x0296) }, /* Quectel BG96 */
++	{ USB_DEVICE(0x2C7C, 0x0700) }, /* Quectel BG95/BG77/BG600L-M3/BC69 */
++	{ USB_DEVICE(0x2C7C, 0x0435) }, /* Quectel AG35 */
++	{ USB_DEVICE(0x2C7C, 0x0415) }, /* Quectel AG15 */
++	{ USB_DEVICE(0x2C7C, 0x0452) }, /* Quectel AG520R */
++	{ USB_DEVICE(0x2C7C, 0x0455) }, /* Quectel AG550R */
++	{ USB_DEVICE(0x2C7C, 0x0620) }, /* Quectel EG20 */
++	{ USB_DEVICE(0x2C7C, 0x0800) }, /* Quectel RG500Q/RM500Q/RG510Q/RM510Q */
++#endif
+ 	{ USB_DEVICE(OPTION_VENDOR_ID, OPTION_PRODUCT_COLT) },
+ 	{ USB_DEVICE(OPTION_VENDOR_ID, OPTION_PRODUCT_RICOLA) },
+ 	{ USB_DEVICE(OPTION_VENDOR_ID, OPTION_PRODUCT_RICOLA_LIGHT) },
+@@ -2209,6 +2225,9 @@ static struct usb_serial_driver option_1port_device = {
+ #ifdef CONFIG_PM
+ 	.suspend           = usb_wwan_suspend,
+ 	.resume            = usb_wwan_resume,
++#if 1 //Added by Quectel
++	.reset_resume = usb_wwan_resume,
++#endif
+ #endif
+ };
+ 
+diff --git a/drivers/usb/serial/qcserial.c b/drivers/usb/serial/qcserial.c
+index 586ef5551e76..b02d64b573af 100644
+--- a/drivers/usb/serial/qcserial.c
++++ b/drivers/usb/serial/qcserial.c
+@@ -26,8 +26,11 @@ enum qcserial_layouts {
+ 	QCSERIAL_G1K = 1,	/* Gobi 1000 */
+ 	QCSERIAL_SWI = 2,	/* Sierra Wireless */
+ 	QCSERIAL_HWI = 3,	/* Huawei */
++	QCSERIAL_CEI = 4,	/* Compal 5G*/
+ };
+ 
++#define DEVICE_CEI(v, p) \
++	USB_DEVICE(v, p), .driver_info = QCSERIAL_CEI 
+ #define DEVICE_G1K(v, p) \
+ 	USB_DEVICE(v, p), .driver_info = QCSERIAL_G1K
+ #define DEVICE_SWI(v, p) \
+@@ -183,7 +186,7 @@ static const struct usb_device_id id_table[] = {
+ 	{DEVICE_SWI(0x413c, 0x81d0)},   /* Dell Wireless 5819 */
+ 	{DEVICE_SWI(0x413c, 0x81d1)},   /* Dell Wireless 5818 */
+ 	{DEVICE_SWI(0x413c, 0x81d2)},   /* Dell Wireless 5818 */
+-
++	{DEVICE_CEI(0x05c6, 0x9091)},	/* CEI SDX55 */
+ 	/* Huawei devices */
+ 	{DEVICE_HWI(0x03f0, 0x581d)},	/* HP lt4112 LTE/HSPA+ Gobi 4G Modem (Huawei me906e) */
+ 
+@@ -398,6 +401,31 @@ static int qcprobe(struct usb_serial *serial, const struct usb_device_id *id)
+ 				intf->desc.bInterfaceProtocol);
+ 		}
+ 		break;
++	case QCSERIAL_CEI:
++		/*
++		* CEI layout:
++		* 0: DIAG (use libqcdm from ModemManager for communication)
++		* 1: modem
++		* 2: QMI/net
++		* 3: ADB
++		*/
++
++		switch (ifnum) {
++		case 0:
++			dev_err(dev, "DM/DIAG interface found\n");
++			break;
++		case 1:
++			dev_err(dev, "Modem port found\n");
++			sendsetup = true;
++			break;
++		default:
++		/* don't claim any unsupported interface */
++			dev_err(dev, "unsupported port found%d\n",ifnum);
++			altsetting = -1;
++			break;
++		}
++		break;
++
+ 	default:
+ 		dev_err(dev, "unsupported device layout type: %lu\n",
+ 			id->driver_info);
+diff --git a/drivers/usb/serial/usb_wwan.c b/drivers/usb/serial/usb_wwan.c
+index f21f25a8cf6f..12c6826ad6c2 100644
+--- a/drivers/usb/serial/usb_wwan.c
++++ b/drivers/usb/serial/usb_wwan.c
+@@ -432,6 +432,19 @@ static struct urb *usb_wwan_setup_urb(struct usb_serial_port *port,
+ 			  usb_sndbulkpipe(serial->dev, endpoint) | dir,
+ 			  buf, len, callback, ctx);
+ 
++#if 1 //Added by Quectel for Zero Packet
++	if (dir == USB_DIR_OUT) {
++		if (serial->dev->descriptor.idVendor == cpu_to_le16(0x05C6) && serial->dev->descriptor.idProduct == cpu_to_le16(0x9090))
++			urb->transfer_flags |= URB_ZERO_PACKET;
++		if (serial->dev->descriptor.idVendor == cpu_to_le16(0x05C6) && serial->dev->descriptor.idProduct == cpu_to_le16(0x9003))
++			urb->transfer_flags |= URB_ZERO_PACKET;
++		if (serial->dev->descriptor.idVendor == cpu_to_le16(0x05C6) && serial->dev->descriptor.idProduct == cpu_to_le16(0x9215))
++			urb->transfer_flags |= URB_ZERO_PACKET;
++		if (serial->dev->descriptor.idVendor == cpu_to_le16(0x2C7C))
++			urb->transfer_flags |= URB_ZERO_PACKET;
++	}
++#endif
++
+ 	if (intfdata->use_zlp && dir == USB_DIR_OUT)
+ 		urb->transfer_flags |= URB_ZERO_PACKET;
+ 
+diff --git a/sound/soc/codecs/tlv320aic3x.c b/sound/soc/codecs/tlv320aic3x.c
+index 7731593a5509..e6e44fda5440 100644
+--- a/sound/soc/codecs/tlv320aic3x.c
++++ b/sound/soc/codecs/tlv320aic3x.c
+@@ -1822,7 +1822,7 @@ int aic3x_probe(struct device *dev, struct regmap *regmap, kernel_ulong_t driver
+ 	}
+ 
+ 	aic3x->model = driver_data;
+-
++/*
+ 	if (gpio_is_valid(aic3x->gpio_reset) &&
+ 	    !aic3x_is_shared_reset(aic3x)) {
+ 		ret = gpio_request(aic3x->gpio_reset, "tlv320aic3x reset");
+@@ -1830,6 +1830,18 @@ int aic3x_probe(struct device *dev, struct regmap *regmap, kernel_ulong_t driver
+ 			goto err;
+ 		gpio_direction_output(aic3x->gpio_reset, 0);
+ 	}
++*/
++	if (gpio_is_valid(aic3x->gpio_reset)) {
++		ret = devm_gpio_request_one(dev, aic3x->gpio_reset,
++				GPIOF_OUT_INIT_LOW, "tlv320aic3x reset");
++		if (ret != 0)
++			goto err;
++	}
++	if (gpio_is_valid(aic3x->gpio_reset)) {
++		ndelay(10);
++		gpio_set_value_cansleep(aic3x->gpio_reset, 1);
++		mdelay(1);
++	}
+ 
+ 	for (i = 0; i < ARRAY_SIZE(aic3x->supplies); i++)
+ 		aic3x->supplies[i].supply = aic3x_supply_names[i];
+diff --git a/sound/soc/fsl/fsl_sai.c b/sound/soc/fsl/fsl_sai.c
+index 1f3eff2528d7..f3f1ef8107e9 100644
+--- a/sound/soc/fsl/fsl_sai.c
++++ b/sound/soc/fsl/fsl_sai.c
+@@ -456,8 +456,8 @@ static int fsl_sai_set_bclk(struct snd_soc_dai *dai, bool tx, u32 freq)
+ 		 * Drop the source that can not be
+ 		 * divided into the required rate.
+ 		 */
+-		if (ret != 0 && clk_rate / ret < 1000)
+-			continue;
++		//if (ret != 0 && clk_rate / ret < 1000)
++			//continue;
+ 
+ 		dev_dbg(dai->dev,
+ 			"ratio %d for freq %dHz based on clock %ldHz\n",
+@@ -480,7 +480,7 @@ static int fsl_sai_set_bclk(struct snd_soc_dai *dai, bool tx, u32 freq)
+ 	if (saveratio == 0) {
+ 		dev_err(dai->dev, "failed to derive required %cx rate: %d\n",
+ 				tx ? 'T' : 'R', freq);
+-		return -EINVAL;
++		//return -EINVAL;
+ 	}
+ 
+ 	/*

@@ -1,0 +1,24 @@
+From 9ad29eacb26f0467b5478746d525dbc09bfeaef5 Mon Sep 17 00:00:00 2001
+From: ASE development tool <ase@densitron.com>
+Date: Tue, 8 Jul 2025 14:07:36 +0200
+Subject: [PATCH] Added clock for sai3
+
+---
+ drivers/clk/imx/clk-pll14xx.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/clk/imx/clk-pll14xx.c b/drivers/clk/imx/clk-pll14xx.c
+index 1563a7bff422..695596dbc003 100644
+--- a/drivers/clk/imx/clk-pll14xx.c
++++ b/drivers/clk/imx/clk-pll14xx.c
+@@ -58,6 +58,7 @@ static const struct imx_pll14xx_rate_table imx_pll1416x_tbl[] = {
+ static const struct imx_pll14xx_rate_table imx_pll1443x_tbl[] = {
+ 	PLL_1443X_RATE(1039500000U, 173, 2, 1, 16384),
+ 	PLL_1443X_RATE(650000000U, 325, 3, 2, 0),
+ 	PLL_1443X_RATE(594000000U, 198, 2, 2, 0),
++	PLL_1443X_RATE(552960000U, 576, 25, 0, 0), /* FIX: added clock at 552960000Hz for  sai3.mclk @ 46080000Hz */
+ 	PLL_1443X_RATE(519750000U, 173, 2, 2, 16384),
+ 	PLL_1443X_RATE(393216000U, 262, 2, 3, 9437),
+-- 
+2.25.1
+

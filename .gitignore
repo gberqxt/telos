@@ -1,0 +1,9 @@
+
+_export/
+./data/downloads
+./data/downloads/
+./data/imx8p_build/
+./data/imx-setup-release.sh
+./data/README
+./data/README-IMXBSP
+./data/setup-environment

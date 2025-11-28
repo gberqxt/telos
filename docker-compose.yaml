@@ -1,0 +1,21 @@
+
+
+services:
+  telos-inf1000:
+    container_name: telos-inf1000
+    hostname: telos-inf1000
+    image: telos-inf1000:v2.0
+    tty: true
+    #deploy:
+    #  resources:
+    #    limits:
+    #      cpus: "4.0"
+    #      memory: 6G
+    user: "1000:1000"
+    volumes:
+      - ./data:/home/ase/imx-yocto-bsp
+    build:
+      context: dockerfiles
+      dockerfile: Dockerfile
+    entrypoint: /home/ase/entrypoint.sh
+    command: /bin/bash

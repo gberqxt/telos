@@ -1,0 +1,41 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Developer <developer@example.com>
+Date: Thu, 8 May 2025 10:00:00 +0000
+Subject: [PATCH] Add inf1000 to Kconfig and Makefile
+
+---
+ sound/soc/codecs/Kconfig  | 6 ++++++
+ sound/soc/codecs/Makefile | 4 ++++
+ 2 files changed, 10 insertions(+)
+
+diff --git a/sound/soc/codecs/Kconfig b/sound/soc/codecs/Kconfig
+index a78f28ea2bde..ef03290dbc95 100644
+--- a/sound/soc/codecs/Kconfig
++++ b/sound/soc/codecs/Kconfig
+@@ -857,6 +857,12 @@ config SND_SOC_HDAC_HDA
+ config SND_SOC_ICS43432
+ 	tristate "ICS43423 and compatible i2s microphones"
+ 
++config SND_SOC_INF1000
++	tristate "Densitron infinity 1000 audio CODEC"
++	depends on I2C
++	depends on SPI
++
++
+ config SND_SOC_INNO_RK3036
+ 	tristate "Inno codec driver for RK3036 SoC"
+ 	select REGMAP_MMIO
+diff --git a/sound/soc/codecs/Makefile b/sound/soc/codecs/Makefile
+index a6adb49e222f..34609de6eb6f 100644
+--- a/sound/soc/codecs/Makefile
++++ b/sound/soc/codecs/Makefile
+@@ -668,3 +668,7 @@ obj-$(CONFIG_SND_SOC_LPASS_TX_MACRO)	+= snd-soc-lpass-tx-macro.o
+ 
+ # Mux
+ obj-$(CONFIG_SND_SOC_SIMPLE_MUX)	+= snd-soc-simple-mux.o
++
++# Densitron INF1000
++snd-soc-inf1000-objs := inf1000.o
++obj-$(CONFIG_SND_SOC_INF1000) += snd-soc-inf1000.o
+-- 
+2.25.1
