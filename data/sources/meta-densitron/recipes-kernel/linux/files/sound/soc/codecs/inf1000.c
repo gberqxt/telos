@@ -113,11 +113,12 @@ static const struct snd_pcm_hw_constraint_list densitron_rate_constraints = {
 /* FPGA System Control Register Bits (0x0A) */
 #define FPGA_SYSCTRL_SYS_RST         BIT(0)  /* System soft reset */
 #define FPGA_SYSCTRL_ENC0_RST        BIT(1)  /* Encoder 0 reg reset */
-#define FPGA_SYSCTRL_ENC1_RST        BIT(2)  /* Encoder 1 reg reset*/
+#define FPGA_SYSCTRL_ENC1_RST        BIT(2)  /* Encoder 1 reg reset */
+#define FPGA_SYSCTRL_SAI_LOOP        BIT(3)  /* SAI RX/TX internal loop (debug only) */
 #define FPGA_SYSCTRL_SPEAKER_EN      BIT(4)  /* Enable speaker I2S channel */
 #define FPGA_SYSCTRL_HEADSET_EN      BIT(5)  /* Enable headset I2S channel */
-#define FPGA_SYSCTRL_FRONT_MIC_EN    BIT(6)  /* Enable default microphone I2S channel  */
-#define FPGA_SYSCTRL_HEADSET_MIC_EN  BIT(7)  /* Enable headset microphone (was ext_mic) I2S channel  */
+#define FPGA_SYSCTRL_FRONT_MIC_EN    BIT(6)  /* Enable default microphone I2S channel */
+#define FPGA_SYSCTRL_HEADSET_MIC_EN  BIT(7)  /* Enable headset microphone I2S channel */
 
 
 /* FPGA Commands */
@@ -2152,9 +2153,9 @@ static ssize_t fpga_status_show(struct device *dev,
     
     ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_STATUS, &status);
     if (ret < 0)
-        return scnprintf(buf, PAGE_SIZE"Error: %d\n", ret);
+        return scnprintf(buf, PAGE_SIZE, "Error: %d\n", ret);
     
-    return scnprintf(buf, PAGE_SIZE"0x%02x (bin: %c%c%c%c%c%c%c%c)\n  bit4(HP)=%d bit2(BTN1)=%d bit0(BTN0)=%d\n",
+    return scnprintf(buf, PAGE_SIZE, "0x%02x (bin: %c%c%c%c%c%c%c%c)\n  bit4(HP)=%d bit2(BTN1)=%d bit0(BTN0)=%d\n",
                    status,
                    (status & BIT(7)) ? '1' : '0',
                    (status & BIT(6)) ? '1' : '0',
@@ -2179,9 +2180,9 @@ static ssize_t fpga_int_status_show(struct device *dev,
     
     ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_INT_STATUS, &int_status);
     if (ret < 0)
-        return scnprintf(buf, PAGE_SIZE"Error: %d\n", ret);
+        return scnprintf(buf, PAGE_SIZE, "Error: %d\n", ret);
     
-    return scnprintf(buf, PAGE_SIZE"0x%02x (bin: %c%c%c%c%c%c%c%c)\n  HP=%d ENC1=%d BTN1=%d ENC0=%d BTN0=%d\n",
+    return scnprintf(buf, PAGE_SIZE, "0x%02x (bin: %c%c%c%c%c%c%c%c)\n  HP=%d ENC1=%d BTN1=%d ENC0=%d BTN0=%d\n",
                    int_status,
                    (int_status & BIT(7)) ? '1' : '0',
                    (int_status & BIT(6)) ? '1' : '0',
@@ -2268,11 +2269,11 @@ static ssize_t fpga_int_enable_show(struct device *dev,
     
     ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_INT_MASK, &int_masked);
     if (ret < 0)
-        return scnprintf(buf, PAGE_SIZE"Error: %d\n", ret);
+        return scnprintf(buf, PAGE_SIZE, "Error: %d\n", ret);
     
     /* adapt to Interrupt mask in FPGA */
     int_enable = ~int_masked;
-    return scnprintf(buf, PAGE_SIZE"0x%02x (bin: %c%c%c%c%c%c%c%c)\n  HP_EN=%d ENC1_EN=%d BTN1_EN=%d ENC0_EN=%d BTN0_EN=%d\n",
+    return scnprintf(buf, PAGE_SIZE, "0x%02x (bin: %c%c%c%c%c%c%c%c)\n  HP_EN=%d ENC1_EN=%d BTN1_EN=%d ENC0_EN=%d BTN0_EN=%d\n",
                    int_enable,
                    (int_enable & BIT(7)) ? '1' : '0',
                    (int_enable & BIT(6)) ? '1' : '0',
@@ -2321,10 +2322,10 @@ static ssize_t fpga_sysctrl_show(struct device *dev,
     
     ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_SYSCTRL, &sysctrl);
     if (ret < 0)
-        return scnprintf(buf, PAGE_SIZE"Error: %d\n", ret);
+        return scnprintf(buf, PAGE_SIZE, "Error: %d\n", ret);
     
-    return scnprintf(buf, PAGE_SIZE"0x%02x (bin: %c%c%c%c%c%c%c%c)\n"
-                   "  EMB_MIC=%d HEADSET_MIC=%d HEADSET=%d SPEAKER=%d\n",
+    return scnprintf(buf, PAGE_SIZE, "0x%02x (bin: %c%c%c%c%c%c%c%c)\n"
+                   "  EMB_MIC=%d HEADSET_MIC=%d HEADSET=%d SPEAKER=%d SAI_LOOP=%d\n",
                    sysctrl,
                    (sysctrl & BIT(7)) ? '1' : '0',
                    (sysctrl & BIT(6)) ? '1' : '0',
@@ -2337,7 +2338,8 @@ static ssize_t fpga_sysctrl_show(struct device *dev,
                    !!(sysctrl & FPGA_SYSCTRL_FRONT_MIC_EN),
                    !!(sysctrl & FPGA_SYSCTRL_HEADSET_MIC_EN),
                    !!(sysctrl & FPGA_SYSCTRL_HEADSET_EN),
-                   !!(sysctrl & FPGA_SYSCTRL_SPEAKER_EN));
+                   !!(sysctrl & FPGA_SYSCTRL_SPEAKER_EN),
+                   !!(sysctrl & FPGA_SYSCTRL_SAI_LOOP));
 }
 
 static ssize_t fpga_sysctrl_store(struct device *dev,
@@ -2374,9 +2376,9 @@ static ssize_t fpga_fw_version_show(struct device *dev,
     
     ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_FW_VERSION, &fw_version);
     if (ret < 0)
-        return scnprintf(buf, PAGE_SIZE"Error: %d\n", ret);
+        return scnprintf(buf, PAGE_SIZE, "Error: %d\n", ret);
     
-    return scnprintf(buf, PAGE_SIZE"%u (0x%02x)\n", fw_version, fw_version);
+    return scnprintf(buf, PAGE_SIZE, "%u (0x%02x)\n", fw_version, fw_version);
 }
 static DEVICE_ATTR_RO(fpga_fw_version);
 
@@ -2390,7 +2392,7 @@ static ssize_t pcm1748_left_volume_show(struct device *dev,
 {
     struct densitron_audio_priv *priv = dev_get_drvdata(dev);
     
-    return scnprintf(buf, PAGE_SIZE"0x%02x (%u)\n", priv->hp_left_vol, priv->hp_left_vol);
+    return scnprintf(buf, PAGE_SIZE, "0x%02x (%u)\n", priv->hp_left_vol, priv->hp_left_vol);
 }
 
 static ssize_t pcm1748_left_volume_store(struct device *dev,
@@ -2423,7 +2425,7 @@ static ssize_t pcm1748_right_volume_show(struct device *dev,
 {
     struct densitron_audio_priv *priv = dev_get_drvdata(dev);
     
-    return scnprintf(buf, PAGE_SIZE"0x%02x (%u)\n", priv->hp_right_vol, priv->hp_right_vol);
+    return scnprintf(buf, PAGE_SIZE, "0x%02x (%u)\n", priv->hp_right_vol, priv->hp_right_vol);
 }
 
 static ssize_t pcm1748_right_volume_store(struct device *dev,
@@ -2466,7 +2468,7 @@ static ssize_t pcm1748_format_show(struct device *dev,
         default: fmt_str = "Unknown"; break;
     }
     
-    return scnprintf(buf, PAGE_SIZE"0x%02x (%s)\n"
+    return scnprintf(buf, PAGE_SIZE, "0x%02x (%s)\n"
                    "Note: PCM1748 is write-only, showing cached value\n",
                    val, fmt_str);
 }
@@ -2502,7 +2504,7 @@ static ssize_t pcm1748_mute_show(struct device *dev,
     /* PCM1748 has no read capability - show what was last written */
     struct densitron_audio_priv *priv = dev_get_drvdata(dev);
     
-    return scnprintf(buf, PAGE_SIZE"0x%02x (L:%s R:%s)\n"
+    return scnprintf(buf, PAGE_SIZE, "0x%02x (L:%s R:%s)\n"
                    "Note: PCM1748 is write-only, showing cached value\n",
                    priv->pcm1748_mute,
                    (priv->pcm1748_mute & 0x01) ? "Muted" : "Unmuted",
@@ -2541,7 +2543,7 @@ static ssize_t pcm1748_dac_ctrl_show(struct device *dev,
     struct densitron_audio_priv *priv = dev_get_drvdata(dev);
     u8 val = priv->pcm1748_dac_ctrl;
     
-    return scnprintf(buf, PAGE_SIZE"0x%02x (De-emph:%s, Rate:%dkHz, L_DAC:%s, R_DAC:%s)\n"
+    return scnprintf(buf, PAGE_SIZE, "0x%02x (De-emph:%s, Rate:%dkHz, L_DAC:%s, R_DAC:%s)\n"
                    "Note: PCM1748 is write-only, showing cached value\n",
                    val,
                    (val & 0x10) ? "ON" : "OFF",
@@ -2625,7 +2627,7 @@ static ssize_t irq_count_show(struct device *dev,
 {
     struct densitron_audio_priv *priv = dev_get_drvdata(dev);
     
-    return scnprintf(buf, PAGE_SIZE"%d\n", atomic_read(&priv->irq_count));
+    return scnprintf(buf, PAGE_SIZE, "%d\n", atomic_read(&priv->irq_count));
 }
 static DEVICE_ATTR_RO(irq_count);
 
@@ -2636,10 +2638,10 @@ static ssize_t gpio_irq_value_show(struct device *dev,
     int value;
     
     if (!priv->fpga_irq_gpio)
-        return scnprintf(buf, PAGE_SIZE"Not available\n");
+        return scnprintf(buf, PAGE_SIZE, "Not available\n");
     
     value = gpiod_get_value(priv->fpga_irq_gpio);
-    return scnprintf(buf, PAGE_SIZE"%d\n", value);
+    return scnprintf(buf, PAGE_SIZE, "%d\n", value);
 }
 static DEVICE_ATTR_RO(gpio_irq_value);
 
@@ -2648,7 +2650,7 @@ static ssize_t headphones_connected_show(struct device *dev,
 {
     struct densitron_audio_priv *priv = dev_get_drvdata(dev);
     
-    return scnprintf(buf, PAGE_SIZE"%d\n", priv->headphones_connected);
+    return scnprintf(buf, PAGE_SIZE, "%d\n", priv->headphones_connected);
 }
 static DEVICE_ATTR_RO(headphones_connected);
 
@@ -2667,7 +2669,7 @@ static ssize_t dump_all_show(struct device *dev,
     if (ret < 0) int_status = 0xFF;
     
     ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_INT_MASK, &int_mask);
-    if (ret < 0) int_enable = 0xFF;
+    if (ret < 0) int_mask = 0xFF;
     int_enable = ~int_mask;
     
     ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_SYSCTRL, &sysctrl);
@@ -2700,12 +2702,12 @@ static ssize_t dump_all_show(struct device *dev,
                    !!(int_enable & FPGA_INT_EN_BUTTON1),
                    !!(int_enable & FPGA_INT_EN_ENCODER0),
                    !!(int_enable & FPGA_INT_EN_BUTTON0));
-    len += snprintf(buf + len, PAGE_SIZE - len, "SYSCTRL (0x0A):   0x%02x  EMB_MIC:%d HP_MIC:%d HP:%d SPK:%d\n",
-                   sysctrl,
+    len += snprintf(buf + len, PAGE_SIZE - len, "SYSCTRL (0x0A):   0x%02x  EMB_MIC:%d HP_MIC:%d HP:%d SPK:%d SAI_LOOP:%d",
                    !!(sysctrl & FPGA_SYSCTRL_FRONT_MIC_EN),
                    !!(sysctrl & FPGA_SYSCTRL_HEADSET_MIC_EN),
                    !!(sysctrl & FPGA_SYSCTRL_HEADSET_EN),
-                   !!(sysctrl & FPGA_SYSCTRL_SPEAKER_EN));
+                   !!(sysctrl & FPGA_SYSCTRL_SPEAKER_EN),
+                   !!(sysctrl & FPGA_SYSCTRL_SAI_LOOP));
     len += snprintf(buf + len, PAGE_SIZE - len, "\nDriver State\n");
     len += snprintf(buf + len, PAGE_SIZE - len, "============\n");
     len += snprintf(buf + len, PAGE_SIZE - len, "IRQ Count:        %d\n", atomic_read(&priv->irq_count));
@@ -2729,9 +2731,9 @@ static ssize_t poll_status_show(struct device *dev,
     
     ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_STATUS, &status);
     if (ret < 0)
-        return scnprintf(buf, PAGE_SIZE"Error: %d\n", ret);
+        return scnprintf(buf, PAGE_SIZE, "Error: %d\n", ret);
     
-    return scnprintf(buf, PAGE_SIZE"0x%02x  HP:%d BTN1:%d BTN0:%d AUX_PWR:%d POE_PWR:%d\n",
+    return scnprintf(buf, PAGE_SIZE, "0x%02x  HP:%d BTN1:%d BTN0:%d AUX_PWR:%d POE_PWR:%d\n",
                    status,
                    !!(status & FPGA_STATUS_HP_DETECT),
                    !!(status & FPGA_STATUS_BUTTON1),
@@ -2751,11 +2753,11 @@ static ssize_t poll_encoders_show(struct device *dev,
     
     ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_ENCODER0, &encoder0);
     if (ret < 0)
-        return scnprintf(buf, PAGE_SIZE"Error reading encoder0: %d\n", ret);
+        return scnprintf(buf, PAGE_SIZE, "Error reading encoder0: %d\n", ret);
     
     ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_ENCODER1, &encoder1);
     if (ret < 0)
-        return scnprintf(buf, PAGE_SIZE"Error reading encoder1: %d\n", ret);
+        return scnprintf(buf, PAGE_SIZE, "Error reading encoder1: %d\n", ret);
     
     len += snprintf(buf + len, PAGE_SIZE - len, "Encoder0 (Right): 0x%02x (%d)\n", 
                    encoder0, (int8_t)encoder0);
@@ -2823,7 +2825,7 @@ static ssize_t poll_all_show(struct device *dev,
     if (ret < 0) hp_threshold = 0xFF;
     
     ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_INT_MASK, &int_enable);
-    if (ret < 0) int_enable = 0xFF;
+    if (ret < 0) int_mask = 0xFF;
     int_enable = ~int_mask;
     
     ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_FW_VERSION, &fw_ver);
@@ -2953,7 +2955,7 @@ static ssize_t rotary_position_show(struct device *dev,
 {
     struct densitron_audio_priv *priv = dev_get_drvdata(dev);
     
-    return scnprintf(buf, PAGE_SIZE"Left: %3d; Right: %3d\n", 
+    return scnprintf(buf, PAGE_SIZE, "Left: %3d; Right: %3d\n", 
                    priv->left_rotary_position,
                    priv->right_rotary_position);
 }
