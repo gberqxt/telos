@@ -509,6 +509,20 @@ static int tas5733_write_reg16(struct i2c_client *client, u8 reg, u16 value)
     return ret;
 }
 
+static int tas5733_read_reg16(struct i2c_client *client, u8 reg, u16 *value)
+{
+    u8 data[2];
+    int ret = i2c_smbus_read_i2c_block_data(client, reg, 2, data);
+    if (ret == 2) {
+        *value = (data[0] << 8) | data[1];
+        dev_dbg(&client->dev, "TAS5733 read reg16 0x%02x = 0x%04x\n", reg, *value);
+        return 0;
+    } else {
+        dev_err(&client->dev, "TAS5733 read reg16 0x%02x failed: %d\n", reg, ret);
+        return ret < 0 ? ret : -EIO;
+    }
+}
+
 /* ============================================================================
  * Hardware Initialization Functions
  * ============================================================================ */
@@ -2395,9 +2409,9 @@ static ssize_t fpga_headset_mic_gain_show(struct device *dev,
     
     ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_HEADSET_MIC_GAIN, &gain);
     if (ret < 0)
-        return sprintf(buf, "Error: %d\n", ret);
+        return scnprintf(buf, PAGE_SIZE, "Error: %d\n", ret);
     
-    return sprintf(buf, "0x%02x (%u) = %+d dB\n", 
+    return scnprintf(buf, PAGE_SIZE, "0x%02x (%u) = %+d dB\n", 
                    gain, gain, mic_gain_hw_to_db(gain));
 }
 
@@ -2436,9 +2450,9 @@ static ssize_t fpga_front_mic_gain_show(struct device *dev,
     
     ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_FRONT_MIC_GAIN, &gain);
     if (ret < 0)
-        return sprintf(buf, "Error: %d\n", ret);
+        return scnprintf(buf, PAGE_SIZE, "Error: %d\n", ret);
     
-    return sprintf(buf, "0x%02x (%u) = %+d dB\n", 
+    return scnprintf(buf, PAGE_SIZE, "0x%02x (%u) = %+d dB\n", 
                    gain, gain, mic_gain_hw_to_db(gain));
 }
 
@@ -2477,9 +2491,9 @@ static ssize_t fpga_hp_threshold_show(struct device *dev,
     
     ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_HP_THRESHOLD, &threshold);
     if (ret < 0)
-        return sprintf(buf, "Error: %d\n", ret);
+        return scnprintf(buf, PAGE_SIZE, "Error: %d\n", ret);
     
-    return sprintf(buf, "0x%02x (%u)\n", threshold, threshold);
+    return scnprintf(buf, PAGE_SIZE, "0x%02x (%u)\n", threshold, threshold);
 }
 
 static ssize_t fpga_hp_threshold_store(struct device *dev,
@@ -2746,6 +2760,375 @@ static ssize_t pcm1748_dump_show(struct device *dev,
     return len;
 }
 static DEVICE_ATTR_RO(pcm1748_dump);
+
+/* ============================================================================
+ * TAS5733L Debug SYSFS Interface
+ * ============================================================================ */
+
+static ssize_t tas5733_device_id_show(struct device *dev,
+                                       struct device_attribute *attr, char *buf)
+{
+    struct densitron_audio_priv *priv = dev_get_drvdata(dev);
+    u8 device_id;
+    int ret;
+    
+    if (!priv->tas5733_client)
+        return scnprintf(buf, PAGE_SIZE, "Error: TAS5733 not available\n");
+    
+    ret = tas5733_read_reg(priv->tas5733_client, TAS5733_DEVICE_ID, &device_id);
+    if (ret < 0)
+        return scnprintf(buf, PAGE_SIZE, "Error: %d\n", ret);
+    
+    return scnprintf(buf, PAGE_SIZE, "0x%02x\n", device_id);
+}
+static DEVICE_ATTR_RO(tas5733_device_id);
+
+static ssize_t tas5733_error_status_show(struct device *dev,
+                                          struct device_attribute *attr, char *buf)
+{
+    struct densitron_audio_priv *priv = dev_get_drvdata(dev);
+    u8 error_status;
+    int ret;
+    
+    if (!priv->tas5733_client)
+        return scnprintf(buf, PAGE_SIZE, "Error: TAS5733 not available\n");
+    
+    ret = tas5733_read_reg(priv->tas5733_client, TAS5733_ERROR_STATUS, &error_status);
+    if (ret < 0)
+        return scnprintf(buf, PAGE_SIZE, "Error: %d\n", ret);
+    
+    return scnprintf(buf, PAGE_SIZE, "0x%02x (OCE:%d DCE:%d OTE:%d)\n",
+                   error_status,
+                   !!(error_status & BIT(4)),  /* Over-current error */
+                   !!(error_status & BIT(3)),  /* DC error */
+                   !!(error_status & BIT(2))); /* Over-temperature error */
+}
+
+static ssize_t tas5733_error_status_store(struct device *dev,
+                                           struct device_attribute *attr,
+                                           const char *buf, size_t count)
+{
+    struct densitron_audio_priv *priv = dev_get_drvdata(dev);
+    unsigned long val;
+    int ret;
+    
+    if (!priv->tas5733_client)
+        return -ENODEV;
+    
+    ret = kstrtoul(buf, 0, &val);
+    if (ret)
+        return ret;
+    
+    if (val > 0xFF)
+        return -EINVAL;
+    
+    ret = tas5733_write_reg(priv->tas5733_client, TAS5733_ERROR_STATUS, (u8)val);
+    if (ret < 0)
+        return ret;
+    
+    dev_dbg(dev, "TAS5733 error status cleared with 0x%02x\n", (u8)val);
+    return count;
+}
+static DEVICE_ATTR_RW(tas5733_error_status);
+
+static ssize_t tas5733_left_volume_show(struct device *dev,
+                                         struct device_attribute *attr, char *buf)
+{
+    struct densitron_audio_priv *priv = dev_get_drvdata(dev);
+    u16 volume;
+    int ret;
+    
+    if (!priv->tas5733_client)
+        return scnprintf(buf, PAGE_SIZE, "Error: TAS5733 not available\n");
+    
+    ret = tas5733_read_reg16(priv->tas5733_client, TAS5733_LEFT_VOL, &volume);
+    if (ret < 0)
+        return scnprintf(buf, PAGE_SIZE, "Error: %d\n", ret);
+    
+    return scnprintf(buf, PAGE_SIZE, "0x%04x (%u)\n", volume, volume);
+}
+
+static ssize_t tas5733_left_volume_store(struct device *dev,
+                                          struct device_attribute *attr,
+                                          const char *buf, size_t count)
+{
+    struct densitron_audio_priv *priv = dev_get_drvdata(dev);
+    unsigned long val;
+    int ret;
+    
+    if (!priv->tas5733_client)
+        return -ENODEV;
+    
+    ret = kstrtoul(buf, 0, &val);
+    if (ret)
+        return ret;
+    
+    if (val > 0xFFFF)
+        return -EINVAL;
+    
+    ret = tas5733_write_reg16(priv->tas5733_client, TAS5733_LEFT_VOL, (u16)val);
+    if (ret < 0)
+        return ret;
+    
+    priv->speaker_left_vol = val;
+    dev_dbg(dev, "TAS5733 left volume set to 0x%04x\n", (u16)val);
+    return count;
+}
+static DEVICE_ATTR_RW(tas5733_left_volume);
+
+static ssize_t tas5733_right_volume_show(struct device *dev,
+                                          struct device_attribute *attr, char *buf)
+{
+    struct densitron_audio_priv *priv = dev_get_drvdata(dev);
+    u16 volume;
+    int ret;
+    
+    if (!priv->tas5733_client)
+        return scnprintf(buf, PAGE_SIZE, "Error: TAS5733 not available\n");
+    
+    ret = tas5733_read_reg16(priv->tas5733_client, TAS5733_RIGHT_VOL, &volume);
+    if (ret < 0)
+        return scnprintf(buf, PAGE_SIZE, "Error: %d\n", ret);
+    
+    return scnprintf(buf, PAGE_SIZE, "0x%04x (%u)\n", volume, volume);
+}
+
+static ssize_t tas5733_right_volume_store(struct device *dev,
+                                           struct device_attribute *attr,
+                                           const char *buf, size_t count)
+{
+    struct densitron_audio_priv *priv = dev_get_drvdata(dev);
+    unsigned long val;
+    int ret;
+    
+    if (!priv->tas5733_client)
+        return -ENODEV;
+    
+    ret = kstrtoul(buf, 0, &val);
+    if (ret)
+        return ret;
+    
+    if (val > 0xFFFF)
+        return -EINVAL;
+    
+    ret = tas5733_write_reg16(priv->tas5733_client, TAS5733_RIGHT_VOL, (u16)val);
+    if (ret < 0)
+        return ret;
+    
+    priv->speaker_right_vol = val;
+    dev_dbg(dev, "TAS5733 right volume set to 0x%04x\n", (u16)val);
+    return count;
+}
+static DEVICE_ATTR_RW(tas5733_right_volume);
+
+static ssize_t tas5733_master_volume_show(struct device *dev,
+                                           struct device_attribute *attr, char *buf)
+{
+    struct densitron_audio_priv *priv = dev_get_drvdata(dev);
+    u16 volume;
+    int ret;
+    
+    if (!priv->tas5733_client)
+        return scnprintf(buf, PAGE_SIZE, "Error: TAS5733 not available\n");
+    
+    ret = tas5733_read_reg16(priv->tas5733_client, TAS5733_MASTER_VOL, &volume);
+    if (ret < 0)
+        return scnprintf(buf, PAGE_SIZE, "Error: %d\n", ret);
+    
+    return scnprintf(buf, PAGE_SIZE, "0x%04x (%u)\n", volume, volume);
+}
+
+static ssize_t tas5733_master_volume_store(struct device *dev,
+                                            struct device_attribute *attr,
+                                            const char *buf, size_t count)
+{
+    struct densitron_audio_priv *priv = dev_get_drvdata(dev);
+    unsigned long val;
+    int ret;
+    
+    if (!priv->tas5733_client)
+        return -ENODEV;
+    
+    ret = kstrtoul(buf, 0, &val);
+    if (ret)
+        return ret;
+    
+    if (val > 0xFFFF)
+        return -EINVAL;
+    
+    ret = tas5733_write_reg16(priv->tas5733_client, TAS5733_MASTER_VOL, (u16)val);
+    if (ret < 0)
+        return ret;
+    
+    dev_dbg(dev, "TAS5733 master volume set to 0x%04x\n", (u16)val);
+    return count;
+}
+static DEVICE_ATTR_RW(tas5733_master_volume);
+
+static ssize_t tas5733_soft_mute_show(struct device *dev,
+                                       struct device_attribute *attr, char *buf)
+{
+    struct densitron_audio_priv *priv = dev_get_drvdata(dev);
+    u8 mute;
+    int ret;
+    
+    if (!priv->tas5733_client)
+        return scnprintf(buf, PAGE_SIZE, "Error: TAS5733 not available\n");
+    
+    ret = tas5733_read_reg(priv->tas5733_client, TAS5733_SOFT_MUTE, &mute);
+    if (ret < 0)
+        return scnprintf(buf, PAGE_SIZE, "Error: %d\n", ret);
+    
+    return scnprintf(buf, PAGE_SIZE, "0x%02x (R:%s L:%s)\n",
+                   mute,
+                   (mute & BIT(1)) ? "Muted" : "Unmuted",
+                   (mute & BIT(0)) ? "Muted" : "Unmuted");
+}
+
+static ssize_t tas5733_soft_mute_store(struct device *dev,
+                                        struct device_attribute *attr,
+                                        const char *buf, size_t count)
+{
+    struct densitron_audio_priv *priv = dev_get_drvdata(dev);
+    unsigned long val;
+    int ret;
+    
+    if (!priv->tas5733_client)
+        return -ENODEV;
+    
+    ret = kstrtoul(buf, 0, &val);
+    if (ret)
+        return ret;
+    
+    if (val > 0xFF)
+        return -EINVAL;
+    
+    ret = tas5733_write_reg(priv->tas5733_client, TAS5733_SOFT_MUTE, (u8)val);
+    if (ret < 0)
+        return ret;
+    
+    dev_dbg(dev, "TAS5733 soft mute set to 0x%02x\n", (u8)val);
+    return count;
+}
+static DEVICE_ATTR_RW(tas5733_soft_mute);
+
+static ssize_t tas5733_sys_ctrl2_show(struct device *dev,
+                                       struct device_attribute *attr, char *buf)
+{
+    struct densitron_audio_priv *priv = dev_get_drvdata(dev);
+    u8 ctrl;
+    int ret;
+    
+    if (!priv->tas5733_client)
+        return scnprintf(buf, PAGE_SIZE, "Error: TAS5733 not available\n");
+    
+    ret = tas5733_read_reg(priv->tas5733_client, TAS5733_SYS_CTRL2, &ctrl);
+    if (ret < 0)
+        return scnprintf(buf, PAGE_SIZE, "Error: %d\n", ret);
+    
+    return scnprintf(buf, PAGE_SIZE, "0x%02x (HiZ:%s)\n",
+                   ctrl,
+                   (ctrl & BIT(4)) ? "Enabled" : "Disabled");
+}
+
+static ssize_t tas5733_sys_ctrl2_store(struct device *dev,
+                                        struct device_attribute *attr,
+                                        const char *buf, size_t count)
+{
+    struct densitron_audio_priv *priv = dev_get_drvdata(dev);
+    unsigned long val;
+    int ret;
+    
+    if (!priv->tas5733_client)
+        return -ENODEV;
+    
+    ret = kstrtoul(buf, 0, &val);
+    if (ret)
+        return ret;
+    
+    if (val > 0xFF)
+        return -EINVAL;
+    
+    ret = tas5733_write_reg(priv->tas5733_client, TAS5733_SYS_CTRL2, (u8)val);
+    if (ret < 0)
+        return ret;
+    
+    dev_dbg(dev, "TAS5733 SYS_CTRL2 set to 0x%02x\n", (u8)val);
+    return count;
+}
+static DEVICE_ATTR_RW(tas5733_sys_ctrl2);
+
+static ssize_t tas5733_dump_show(struct device *dev,
+                                  struct device_attribute *attr, char *buf)
+{
+    struct densitron_audio_priv *priv = dev_get_drvdata(dev);
+    int len = 0;
+    u8 val8;
+    u16 val16;
+    int ret;
+    
+    if (!priv->tas5733_client) {
+        return scnprintf(buf, PAGE_SIZE, "Error: TAS5733 not available\n");
+    }
+    
+    len += snprintf(buf + len, PAGE_SIZE - len, "=== TAS5733L Register Dump ===\n\n");
+    
+    /* 8-bit registers */
+    ret = tas5733_read_reg(priv->tas5733_client, TAS5733_CLOCK_CTRL, &val8);
+    len += snprintf(buf + len, PAGE_SIZE - len, "0x00 CLOCK_CTRL:    0x%02x\n", 
+                   ret < 0 ? 0xFF : val8);
+    
+    ret = tas5733_read_reg(priv->tas5733_client, TAS5733_DEVICE_ID, &val8);
+    len += snprintf(buf + len, PAGE_SIZE - len, "0x01 DEVICE_ID:     0x%02x\n", 
+                   ret < 0 ? 0xFF : val8);
+    
+    ret = tas5733_read_reg(priv->tas5733_client, TAS5733_ERROR_STATUS, &val8);
+    len += snprintf(buf + len, PAGE_SIZE - len, "0x02 ERROR_STATUS:  0x%02x\n", 
+                   ret < 0 ? 0xFF : val8);
+    
+    ret = tas5733_read_reg(priv->tas5733_client, TAS5733_SYS_CTRL1, &val8);
+    len += snprintf(buf + len, PAGE_SIZE - len, "0x03 SYS_CTRL1:     0x%02x\n", 
+                   ret < 0 ? 0xFF : val8);
+    
+    ret = tas5733_read_reg(priv->tas5733_client, TAS5733_AUDIO_FORMAT, &val8);
+    len += snprintf(buf + len, PAGE_SIZE - len, "0x04 AUDIO_FORMAT:  0x%02x\n", 
+                   ret < 0 ? 0xFF : val8);
+    
+    ret = tas5733_read_reg(priv->tas5733_client, TAS5733_SYS_CTRL2, &val8);
+    len += snprintf(buf + len, PAGE_SIZE - len, "0x05 SYS_CTRL2:     0x%02x\n", 
+                   ret < 0 ? 0xFF : val8);
+    
+    ret = tas5733_read_reg(priv->tas5733_client, TAS5733_SOFT_MUTE, &val8);
+    len += snprintf(buf + len, PAGE_SIZE - len, "0x06 SOFT_MUTE:     0x%02x\n", 
+                   ret < 0 ? 0xFF : val8);
+    
+    /* 16-bit volume registers */
+    ret = tas5733_read_reg16(priv->tas5733_client, TAS5733_MASTER_VOL, &val16);
+    len += snprintf(buf + len, PAGE_SIZE - len, "0x07 MASTER_VOL:    0x%04x (%u)\n", 
+                   ret < 0 ? 0xFFFF : val16, ret < 0 ? 0xFFFF : val16);
+    
+    ret = tas5733_read_reg16(priv->tas5733_client, TAS5733_LEFT_VOL, &val16);
+    len += snprintf(buf + len, PAGE_SIZE - len, "0x08 LEFT_VOL:      0x%04x (%u)\n", 
+                   ret < 0 ? 0xFFFF : val16, ret < 0 ? 0xFFFF : val16);
+    
+    ret = tas5733_read_reg16(priv->tas5733_client, TAS5733_RIGHT_VOL, &val16);
+    len += snprintf(buf + len, PAGE_SIZE - len, "0x09 RIGHT_VOL:     0x%04x (%u)\n", 
+                   ret < 0 ? 0xFFFF : val16, ret < 0 ? 0xFFFF : val16);
+    
+    ret = tas5733_read_reg(priv->tas5733_client, TAS5733_TRIM_REG, &val8);
+    len += snprintf(buf + len, PAGE_SIZE - len, "0x1B TRIM_REG:      0x%02x\n", 
+                   ret < 0 ? 0xFF : val8);
+    
+    ret = tas5733_read_reg(priv->tas5733_client, TAS5733_MOD_SCHEME, &val8);
+    len += snprintf(buf + len, PAGE_SIZE - len, "0x20 MOD_SCHEME:    0x%02x\n", 
+                   ret < 0 ? 0xFF : val8);
+    
+    if (len >= PAGE_SIZE)
+        len = PAGE_SIZE - 1;
+    
+    return len;
+}
+static DEVICE_ATTR_RO(tas5733_dump);
 
 
 static ssize_t irq_count_show(struct device *dev,
@@ -3107,6 +3490,15 @@ static struct attribute *densitron_audio_attrs[] = {
     &dev_attr_poll_status.attr,
     &dev_attr_poll_encoders.attr,
     &dev_attr_poll_all.attr,
+    /* TAS5733L attributes */
+    &dev_attr_tas5733_device_id.attr,
+    &dev_attr_tas5733_error_status.attr,
+    &dev_attr_tas5733_left_volume.attr,
+    &dev_attr_tas5733_right_volume.attr,
+    &dev_attr_tas5733_master_volume.attr,
+    &dev_attr_tas5733_soft_mute.attr,
+    &dev_attr_tas5733_sys_ctrl2.attr,
+    &dev_attr_tas5733_dump.attr,
     /* PCM1748 attributes */
     &dev_attr_pcm1748_left_volume.attr,
     &dev_attr_pcm1748_right_volume.attr,
