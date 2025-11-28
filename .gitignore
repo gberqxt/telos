@@ -1,9 +1,33 @@
 
-_export/
-./data/downloads
-./data/downloads/
-./data/imx8p_build/
-./data/imx-setup-release.sh
-./data/README
-./data/README-IMXBSP
-./data/setup-environment
+
+
+
+# Ignore all layers but meta-densitron layer
+/data/sources/*
+!/data/sources/meta-densitron/
+
+# ignore working directories
+/_export/*
+/data/.repo/*
+/data/downloads/*
+
+# ignore working files
+/data/imx-setup-release.sh
+/data/setup-environment
+/data/README
+/data/README-IMXBSP
+
+
+# Exclude build directory but CONFIG FILES
+/data/imx8p_build/*
+!/data/imx8p_build/conf/local.conf
+!/data/imx8p_build/conf/bblayers.conf
+
+
+
+
+
+
+
+	
+	
