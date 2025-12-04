@@ -84,6 +84,9 @@ static const struct snd_pcm_hw_constraint_list densitron_rate_constraints = {
 #define FPGA_REG_HP_THRESHOLD        0x0D
 #define FPGA_REG_INT_MASK            0x0E  /* Interrupt enable mask */
 #define FPGA_REG_FW_VERSION          0x0F  /* FPGA firmware version (read-only) */
+#define FPGA_REG_PCB_VERSION         0x10  /* PCB version (read-only) */
+#define FPGA_REG_AUDIO_CTRL0         0x11  /* Audio control */
+#define FPGA_REG_AUDIO_STATUS0       0x12  /* Audio status (read-only) */
 
 /* Legacy aliases for compatibility */
 #define FPGA_REG_LEFT_ROTARY         FPGA_REG_ENCODER1
@@ -119,6 +122,16 @@ static const struct snd_pcm_hw_constraint_list densitron_rate_constraints = {
 #define FPGA_SYSCTRL_HEADSET_EN      BIT(5)  /* Enable headset I2S channel */
 #define FPGA_SYSCTRL_FRONT_MIC_EN    BIT(6)  /* Enable default microphone I2S channel */
 #define FPGA_SYSCTRL_HEADSET_MIC_EN  BIT(7)  /* Enable headset microphone I2S channel */
+
+/* AUDIO_CTRL0 Register Bits (0x11) */
+#define FPGA_AUDIO_12V_PD            BIT(7)  /* 12V power down (active low) */
+#define FPGA_AUDIO_SPKR_FMT          BIT(2)  /* PCM1808 FMT */
+#define FPGA_AUDIO_SPKR_MD1          BIT(1)  /* PCM1808 MD1 */
+#define FPGA_AUDIO_SPKR_MD0          BIT(0)  /* PCM1808 MD0 */
+
+/* AUDIO_STATUS0 Register Bits (0x12) */
+#define FPGA_AUDIO_DAC_ZEROR         BIT(1)  /* PCM1748 zero detect right */
+#define FPGA_AUDIO_DAC_ZEROL         BIT(0)  /* PCM1748 zero detect left */
 
 
 /* FPGA Commands */
@@ -552,6 +565,7 @@ static int tas5733_init(struct densitron_audio_priv *priv)
 {
     struct i2c_client *client = priv->tas5733_client;
     unsigned int init_volume_reg;
+    u8 audio_ctrl_reg;
     int ret;
 
     dev_dbg(&client->dev, "Initializing TAS5733L power amplifier...\n");
@@ -611,6 +625,16 @@ static int tas5733_init(struct densitron_audio_priv *priv)
     /* Store initial volume values */
     priv->speaker_left_vol = init_volume_reg;
     priv->speaker_right_vol = init_volume_reg;
+    
+    /* Enable 12V amplifier power (12V_PD is active low, so clear bit) */
+    ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_AUDIO_CTRL0, &audio_ctrl_reg);
+    if (ret == 0) {
+        audio_ctrl_reg &= ~FPGA_AUDIO_12V_PD;  /* Clear bit to enable power */
+        ret = fpga_write_reg(priv->fpga_spi, FPGA_REG_AUDIO_CTRL0, audio_ctrl_reg);
+        if (ret == 0) {
+            dev_dbg(&client->dev, "12V amplifier power enabled\n");
+        }
+    }
     
     
     dev_dbg(&client->dev, "TAS5733L initialized successfully\n");
@@ -681,7 +705,7 @@ static int fpga_init(struct densitron_audio_priv *priv)
 {
     struct spi_device *spi = priv->fpga_spi;
     u8 status, fw_version, sysctrl, default_gain_hw;
-    u8 active_irq, int_mask;
+    u8 active_irq;
     int ret;
     
     dev_dbg(&spi->dev, "Initializing FPGA...\n");
@@ -3224,6 +3248,7 @@ static ssize_t dump_all_show(struct device *dev,
 {
     struct densitron_audio_priv *priv = dev_get_drvdata(dev);
     u8 status, int_status, int_mask, int_enable, sysctrl, fw_ver;
+    u8 pcb_ver, audio_ctrl, audio_status;
     int gpio_val, len = 0;
     int ret;
     
@@ -3243,11 +3268,21 @@ static ssize_t dump_all_show(struct device *dev,
     ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_FW_VERSION, &fw_ver);
     if (ret < 0) fw_ver = 0xFF;
     
+    ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_PCB_VERSION, &pcb_ver);
+    if (ret < 0) pcb_ver = 0xFF;
+    
+    ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_AUDIO_CTRL0, &audio_ctrl);
+    if (ret < 0) audio_ctrl = 0xFF;
+    
+    ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_AUDIO_STATUS0, &audio_status);
+    if (ret < 0) audio_status = 0xFF;
+    
     gpio_val = priv->fpga_irq_gpio ? gpiod_get_value(priv->fpga_irq_gpio) : -1;
     
     len += snprintf(buf + len, PAGE_SIZE - len, "FPGA Register Dump\n");
     len += snprintf(buf + len, PAGE_SIZE - len, "==================\n");
     len += snprintf(buf + len, PAGE_SIZE - len, "FW Version:       0x%02x (%u)\n", fw_ver, fw_ver);
+    len += snprintf(buf + len, PAGE_SIZE - len, "PCB Version:      0x%02x (%u)\n", pcb_ver, pcb_ver);
     len += snprintf(buf + len, PAGE_SIZE - len, "STATUS (0x08):    0x%02x  HP:%d BTN1:%d BTN0:%d\n",
                    status,
                    !!(status & FPGA_STATUS_HP_DETECT),
@@ -3267,12 +3302,23 @@ static ssize_t dump_all_show(struct device *dev,
                    !!(int_enable & FPGA_INT_MSK_BUTTON1),
                    !!(int_enable & FPGA_INT_MSK_ENCODER0),
                    !!(int_enable & FPGA_INT_MSK_BUTTON0));
-    len += snprintf(buf + len, PAGE_SIZE - len, "SYSCTRL (0x0A):   0x%02x  EMB_MIC:%d HP_MIC:%d HP:%d SPK:%d SAI_LOOP:%d",
+    len += snprintf(buf + len, PAGE_SIZE - len, "SYSCTRL (0x0A):   0x%02x  EMB_MIC:%d HP_MIC:%d HP:%d SPK:%d SAI_LOOP:%d\n",
+                   sysctrl,
                    !!(sysctrl & FPGA_SYSCTRL_FRONT_MIC_EN),
                    !!(sysctrl & FPGA_SYSCTRL_HEADSET_MIC_EN),
                    !!(sysctrl & FPGA_SYSCTRL_HEADSET_EN),
                    !!(sysctrl & FPGA_SYSCTRL_SPEAKER_EN),
                    !!(sysctrl & FPGA_SYSCTRL_SAI_LOOP));
+    len += snprintf(buf + len, PAGE_SIZE - len, "AUDIO_CTRL (0x11):0x%02x  12V_PD:%d FMT:%d MD1:%d MD0:%d\n",
+                   audio_ctrl,
+                   !!(audio_ctrl & FPGA_AUDIO_12V_PD),
+                   !!(audio_ctrl & FPGA_AUDIO_SPKR_FMT),
+                   !!(audio_ctrl & FPGA_AUDIO_SPKR_MD1),
+                   !!(audio_ctrl & FPGA_AUDIO_SPKR_MD0));
+    len += snprintf(buf + len, PAGE_SIZE - len, "AUDIO_STAT (0x12):0x%02x  ZEROR:%d ZEROL:%d\n",
+                   audio_status,
+                   !!(audio_status & FPGA_AUDIO_DAC_ZEROR),
+                   !!(audio_status & FPGA_AUDIO_DAC_ZEROL));
     len += snprintf(buf + len, PAGE_SIZE - len, "\nDriver State\n");
     len += snprintf(buf + len, PAGE_SIZE - len, "============\n");
     len += snprintf(buf + len, PAGE_SIZE - len, "IRQ Count:        %d\n", atomic_read(&priv->irq_count));
@@ -3343,6 +3389,7 @@ static ssize_t poll_all_show(struct device *dev,
     u8 led1_r, led1_g, led1_b, led2_r, led2_g, led2_b;
     u8 encoder0, encoder1, status, int_status, sysctrl;
     u8 headset_mic_gain, front_mic_gain, hp_threshold, int_mask, int_enable, fw_ver;
+    u8 pcb_ver, audio_ctrl, audio_status;
     int ret;
     int len = 0;
     
@@ -3389,19 +3436,29 @@ static ssize_t poll_all_show(struct device *dev,
     ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_HP_THRESHOLD, &hp_threshold);
     if (ret < 0) hp_threshold = 0xFF;
     
-    ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_INT_MASK, &int_enable);
+    ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_INT_MASK, &int_mask);
     if (ret < 0) int_mask = 0xFF;
     int_enable = ~int_mask;
     
     ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_FW_VERSION, &fw_ver);
     if (ret < 0) fw_ver = 0xFF;
     
+    ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_PCB_VERSION, &pcb_ver);
+    if (ret < 0) pcb_ver = 0xFF;
+    
+    ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_AUDIO_CTRL0, &audio_ctrl);
+    if (ret < 0) audio_ctrl = 0xFF;
+    
+    ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_AUDIO_STATUS0, &audio_status);
+    if (ret < 0) audio_status = 0xFF;
+    
     /* Format output */
     len += snprintf(buf + len, PAGE_SIZE - len, "=== FPGA Complete Register Dump ===\n");
     len += snprintf(buf + len, PAGE_SIZE - len, "\n");
     
-    /* Firmware version */
+    /* Version info */
     len += snprintf(buf + len, PAGE_SIZE - len, "0x0F FW_VERSION:     0x%02x (%u)\n", fw_ver, fw_ver);
+    len += snprintf(buf + len, PAGE_SIZE - len, "0x10 PCB_VERSION:    0x%02x (%u)\n", pcb_ver, pcb_ver);
     len += snprintf(buf + len, PAGE_SIZE - len, "\n");
     
     /* LED registers */
@@ -3486,10 +3543,11 @@ static ssize_t poll_all_show(struct device *dev,
     len += snprintf(buf + len, PAGE_SIZE - len, "\n");
     
     /* Audio configuration registers */
-    /* Audio configuration registers */
     len += snprintf(buf + len, PAGE_SIZE - len, "Audio Config:\n");
-    len += snprintf(buf + len, PAGE_SIZE - len, "  0x0B HEADSET_MIC_GAIN:  hw=0x%02x (%+ddB)\n", headset_mic_gain, mic_gain_hw_to_db(headset_mic_gain));
-    len += snprintf(buf + len, PAGE_SIZE - len, "  0x0C FRONT_MIC_GAIN: hw=0x%02x (%+ddB)\n", front_mic_gain, mic_gain_hw_to_db(front_mic_gain));
+    len += snprintf(buf + len, PAGE_SIZE - len, "  0x0B HEADSET_MIC_GAIN:  hw=0x%02x (%+ddB)\n", 
+                   headset_mic_gain, mic_gain_hw_to_db(headset_mic_gain));
+    len += snprintf(buf + len, PAGE_SIZE - len, "  0x0C FRONT_MIC_GAIN:    hw=0x%02x (%+ddB)\n", 
+                   front_mic_gain, mic_gain_hw_to_db(front_mic_gain));
     len += snprintf(buf + len, PAGE_SIZE - len, "  0x0D HP_THRESHOLD:      0x%02x (%3u)\n", 
                    hp_threshold, hp_threshold);
     len += snprintf(buf + len, PAGE_SIZE - len, "\n");
@@ -3510,6 +3568,44 @@ static ssize_t poll_all_show(struct device *dev,
     len += snprintf(buf + len, PAGE_SIZE - len, "  bit2 BTN1_EN:    %d\n", !!(int_enable & FPGA_INT_MSK_BUTTON1));
     len += snprintf(buf + len, PAGE_SIZE - len, "  bit1 ENC0_EN:    %d\n", !!(int_enable & FPGA_INT_MSK_ENCODER0));
     len += snprintf(buf + len, PAGE_SIZE - len, "  bit0 BTN0_EN:    %d\n", !!(int_enable & FPGA_INT_MSK_BUTTON0));
+    len += snprintf(buf + len, PAGE_SIZE - len, "\n");
+    
+    /* Audio control register */
+    len += snprintf(buf + len, PAGE_SIZE - len, "0x11 AUDIO_CTRL0:   0x%02x (bin: %c%c%c%c%c%c%c%c)\n",
+                   audio_ctrl,
+                   (audio_ctrl & BIT(7)) ? '1' : '0',
+                   (audio_ctrl & BIT(6)) ? '1' : '0',
+                   (audio_ctrl & BIT(5)) ? '1' : '0',
+                   (audio_ctrl & BIT(4)) ? '1' : '0',
+                   (audio_ctrl & BIT(3)) ? '1' : '0',
+                   (audio_ctrl & BIT(2)) ? '1' : '0',
+                   (audio_ctrl & BIT(1)) ? '1' : '0',
+                   (audio_ctrl & BIT(0)) ? '1' : '0');
+    len += snprintf(buf + len, PAGE_SIZE - len, "  bit7 12V_PD:     %d %s\n", 
+                   !!(audio_ctrl & FPGA_AUDIO_12V_PD),
+                   (audio_ctrl & FPGA_AUDIO_12V_PD) ? "(powered down)" : "(ENABLED)");
+    len += snprintf(buf + len, PAGE_SIZE - len, "  bit2 SPKR_FMT:   %d\n", !!(audio_ctrl & FPGA_AUDIO_SPKR_FMT));
+    len += snprintf(buf + len, PAGE_SIZE - len, "  bit1 SPKR_MD1:   %d\n", !!(audio_ctrl & FPGA_AUDIO_SPKR_MD1));
+    len += snprintf(buf + len, PAGE_SIZE - len, "  bit0 SPKR_MD0:   %d\n", !!(audio_ctrl & FPGA_AUDIO_SPKR_MD0));
+    len += snprintf(buf + len, PAGE_SIZE - len, "\n");
+    
+    /* Audio status register */
+    len += snprintf(buf + len, PAGE_SIZE - len, "0x12 AUDIO_STATUS0: 0x%02x (bin: %c%c%c%c%c%c%c%c)\n",
+                   audio_status,
+                   (audio_status & BIT(7)) ? '1' : '0',
+                   (audio_status & BIT(6)) ? '1' : '0',
+                   (audio_status & BIT(5)) ? '1' : '0',
+                   (audio_status & BIT(4)) ? '1' : '0',
+                   (audio_status & BIT(3)) ? '1' : '0',
+                   (audio_status & BIT(2)) ? '1' : '0',
+                   (audio_status & BIT(1)) ? '1' : '0',
+                   (audio_status & BIT(0)) ? '1' : '0');
+    len += snprintf(buf + len, PAGE_SIZE - len, "  bit1 DAC_ZEROR:  %d %s\n",
+                   !!(audio_status & FPGA_AUDIO_DAC_ZEROR),
+                   (audio_status & FPGA_AUDIO_DAC_ZEROR) ? "(ZERO)" : "(active)");
+    len += snprintf(buf + len, PAGE_SIZE - len, "  bit0 DAC_ZEROL:  %d %s\n",
+                   !!(audio_status & FPGA_AUDIO_DAC_ZEROL),
+                   (audio_status & FPGA_AUDIO_DAC_ZEROL) ? "(ZERO)" : "(active)");
 
     if (len >= PAGE_SIZE)
         len = PAGE_SIZE - 1;
@@ -3529,6 +3625,91 @@ static ssize_t rotary_position_show(struct device *dev,
 }
 static DEVICE_ATTR_RO(rotary_position);
 
+/* PCB Version */
+static ssize_t fpga_pcb_version_show(struct device *dev,
+                                      struct device_attribute *attr, char *buf)
+{
+    struct densitron_audio_priv *priv = dev_get_drvdata(dev);
+    u8 version;
+    int ret;
+    
+    ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_PCB_VERSION, &version);
+    if (ret < 0)
+        return scnprintf(buf, PAGE_SIZE, "Error: %d\n", ret);
+    
+    return scnprintf(buf, PAGE_SIZE, "%u (0x%02x)\n", version, version);
+}
+static DEVICE_ATTR_RO(fpga_pcb_version);
+
+/* PCM1808 Format Control */
+static ssize_t pcm1808_format_show(struct device *dev,
+                                         struct device_attribute *attr, char *buf)
+{
+    struct densitron_audio_priv *priv = dev_get_drvdata(dev);
+    u8 ctrl;
+    int ret;
+    
+    ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_AUDIO_CTRL0, &ctrl);
+    if (ret < 0)
+        return scnprintf(buf, PAGE_SIZE, "Error: %d\n", ret);
+    
+    return scnprintf(buf, PAGE_SIZE, "0x%02x (FMT=%d MD1=%d MD0=%d)\n",
+                   ctrl & 0x07,
+                   !!(ctrl & FPGA_AUDIO_SPKR_FMT),
+                   !!(ctrl & FPGA_AUDIO_SPKR_MD1),
+                   !!(ctrl & FPGA_AUDIO_SPKR_MD0));
+}
+
+static ssize_t pcm1808_format_store(struct device *dev,
+                                          struct device_attribute *attr,
+                                          const char *buf, size_t count)
+{
+    struct densitron_audio_priv *priv = dev_get_drvdata(dev);
+    unsigned long val;
+    u8 ctrl;
+    int ret;
+    
+    ret = kstrtoul(buf, 0, &val);
+    if (ret)
+        return ret;
+    
+    if (val > 0x07)
+        return -EINVAL;
+    
+    /* Read current value, modify only low 3 bits */
+    ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_AUDIO_CTRL0, &ctrl);
+    if (ret < 0)
+        return ret;
+    
+    ctrl = (ctrl & 0xF8) | (val & 0x07);
+    
+    ret = fpga_write_reg(priv->fpga_spi, FPGA_REG_AUDIO_CTRL0, ctrl);
+    if (ret < 0)
+        return ret;
+    
+    return count;
+}
+static DEVICE_ATTR_RW(pcm1808_format);
+
+/* PCM1748 Zero Status */
+static ssize_t pcm1748_zero_status_show(struct device *dev,
+                                              struct device_attribute *attr, char *buf)
+{
+    struct densitron_audio_priv *priv = dev_get_drvdata(dev);
+    u8 status;
+    int ret;
+    
+    ret = fpga_read_reg(priv->fpga_spi, FPGA_REG_AUDIO_STATUS0, &status);
+    if (ret < 0)
+        return scnprintf(buf, PAGE_SIZE, "Error: %d\n", ret);
+    
+    return scnprintf(buf, PAGE_SIZE, "0x%02x (R_ZERO=%d L_ZERO=%d)\n",
+                   status & 0x03,
+                   !!(status & FPGA_AUDIO_DAC_ZEROR),
+                   !!(status & FPGA_AUDIO_DAC_ZEROL));
+}
+static DEVICE_ATTR_RO(pcm1748_zero_status);
+
 
 static struct attribute *densitron_audio_attrs[] = {
     &dev_attr_fpga_status.attr,
@@ -3537,6 +3718,7 @@ static struct attribute *densitron_audio_attrs[] = {
     &dev_attr_fpga_sysctrl.attr,
     &dev_attr_fpga_sai_loop.attr,
     &dev_attr_fpga_fw_version.attr,
+    &dev_attr_fpga_pcb_version.attr,
     &dev_attr_fpga_headset_mic_gain.attr,
     &dev_attr_fpga_front_mic_gain.attr,
     &dev_attr_fpga_hp_threshold.attr,
@@ -3546,8 +3728,10 @@ static struct attribute *densitron_audio_attrs[] = {
     &dev_attr_dump_all.attr,
     &dev_attr_poll_status.attr,
     &dev_attr_poll_encoders.attr,
-    &dev_attr_poll_all.attr,
-    /* TAS5733L attributes */
+    &dev_attr_poll_all.attr,    
+    /* AMP PCM1808 attributes */
+    &dev_attr_pcm1808_format.attr,
+    /* PA TAS5733L attributes */
     &dev_attr_tas5733_device_id.attr,
     &dev_attr_tas5733_error_status.attr,
     &dev_attr_tas5733_left_volume.attr,
@@ -3556,13 +3740,14 @@ static struct attribute *densitron_audio_attrs[] = {
     &dev_attr_tas5733_soft_mute.attr,
     &dev_attr_tas5733_sys_ctrl2.attr,
     &dev_attr_tas5733_dump.attr,
-    /* PCM1748 attributes */
+    /* DAC PCM1748 attributes */
     &dev_attr_pcm1748_left_volume.attr,
     &dev_attr_pcm1748_right_volume.attr,
     &dev_attr_pcm1748_mute.attr,
     &dev_attr_pcm1748_dac_ctrl.attr,      
     &dev_attr_pcm1748_format.attr,
     &dev_attr_pcm1748_dump.attr,
+    &dev_attr_pcm1748_zero_status.attr,
     /* rotary position (integrator) */
     &dev_attr_rotary_position.attr,
     NULL,
@@ -3767,4 +3952,4 @@ module_platform_driver(densitron_audio_platform_driver);
 MODULE_DESCRIPTION("Densitron INF1000 Audio ASoC Driver");
 MODULE_AUTHOR("Gian Luca Bernocchi <gianluca.bernocchi@quixant.com>");
 MODULE_LICENSE("GPL");
-MODULE_VERSION("4.10");
+MODULE_VERSION("4.12");
