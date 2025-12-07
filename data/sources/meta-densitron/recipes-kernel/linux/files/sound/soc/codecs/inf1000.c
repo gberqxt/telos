@@ -3919,6 +3919,16 @@ static int densitron_audio_platform_remove(struct platform_device *pdev)
     /* Cancel work */
     cancel_work_sync(&priv->irq_work);
     
+    /* Explicitly unregister LED devices
+     * Note: LEDs were registered to fpga_spi device, not platform device,
+     * so devm_ won't auto-cleanup on platform unbind */
+    devm_led_classdev_unregister(&priv->fpga_spi->dev, &priv->led1_r);
+    devm_led_classdev_unregister(&priv->fpga_spi->dev, &priv->led1_g);
+    devm_led_classdev_unregister(&priv->fpga_spi->dev, &priv->led1_b);
+    devm_led_classdev_unregister(&priv->fpga_spi->dev, &priv->led2_r);
+    devm_led_classdev_unregister(&priv->fpga_spi->dev, &priv->led2_g);
+    devm_led_classdev_unregister(&priv->fpga_spi->dev, &priv->led2_b);
+    
     /* Print debug statistics */
     dev_dbg(&pdev->dev, "IRQ count: %d, Format rejects: %d\n",
              atomic_read(&priv->irq_count), atomic_read(&priv->format_rejects));
