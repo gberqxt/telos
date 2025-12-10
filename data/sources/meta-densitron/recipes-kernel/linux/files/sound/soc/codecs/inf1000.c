@@ -82,7 +82,7 @@ static const struct snd_pcm_hw_constraint_list densitron_rate_constraints = {
 #define FPGA_REG_HEADSET_MIC_GAIN    0x0B
 #define FPGA_REG_FRONT_MIC_GAIN      0x0C
 #define FPGA_REG_HP_THRESHOLD        0x0D
-#define FPGA_REG_INT_MASK            0x0E  /* Interrupt enable mask */
+#define FPGA_REG_INT_MASK            0x0E  /* Interrupt masking */
 #define FPGA_REG_FW_VERSION          0x0F  /* FPGA firmware version (read-only) */
 #define FPGA_REG_PCB_VERSION         0x10  /* PCB version (read-only) */
 #define FPGA_REG_AUDIO_CTRL0         0x11  /* Audio control */
