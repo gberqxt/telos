@@ -1378,6 +1378,10 @@ static void led_brightness_set(struct led_classdev *led_cdev,
 {
     struct densitron_audio_priv *priv;
     u8 reg;
+    
+    /* Early exit if device is being removed */
+    if (!led_cdev || !led_cdev->name)
+        return;
 
     /* Determine which LED this is by checking the container */
     if (strstr(led_cdev->name, "led1")) {
@@ -3912,6 +3916,18 @@ static int densitron_audio_platform_probe(struct platform_device *pdev)
 static int densitron_audio_platform_remove(struct platform_device *pdev)
 {
     struct densitron_audio_priv *priv = platform_get_drvdata(pdev);
+    
+    /* Stop all audio operations before teardown */
+    if (priv->component && priv->component->card) {
+        struct snd_card *card = priv->component->card->snd_card;
+        dev_info(&pdev->dev, "Disconnecting audio card...\n");
+        snd_card_disconnect_sync(card);
+    }
+    
+    /* Mask all FPGA interrupts immediately */
+    if (priv->fpga_spi) {
+        fpga_write_reg(priv->fpga_spi, FPGA_REG_INT_MASK, 0xFF);
+    }
 
     /* Mark as uninitialized for potential rebind */
     mutex_lock(&priv->hw_lock);
@@ -3924,6 +3940,16 @@ static int densitron_audio_platform_remove(struct platform_device *pdev)
     /* Cancel work */
     cancel_work_sync(&priv->irq_work);
     
+    /* Unregister input devices before freeing priv */
+    if (priv->left_rotary) {
+        input_unregister_device(priv->left_rotary);
+        priv->left_rotary = NULL;
+    }
+    if (priv->right_rotary) {
+        input_unregister_device(priv->right_rotary);
+        priv->right_rotary = NULL;
+    }
+    
     /* Explicitly unregister LED devices
      * Note: LEDs were registered to fpga_spi device, not platform device,
      * so devm_ won't auto-cleanup on platform unbind */
@@ -3933,6 +3959,13 @@ static int densitron_audio_platform_remove(struct platform_device *pdev)
     devm_led_classdev_unregister(&priv->fpga_spi->dev, &priv->led2_r);
     devm_led_classdev_unregister(&priv->fpga_spi->dev, &priv->led2_g);
     devm_led_classdev_unregister(&priv->fpga_spi->dev, &priv->led2_b);
+    
+    
+    // Soft mute speakers and headphones
+    if (priv->hardware_initialized && priv->tas5733_client && priv->pcm1748_spi) {
+        tas5733_write_reg(priv->tas5733_client, TAS5733_SOFT_MUTE, 0x07);
+        pcm1748_write_reg(priv->pcm1748_spi, PCM1748_SOFT_MUTE, 0x01);
+    }
     
     /* Print debug statistics */
     dev_dbg(&pdev->dev, "IRQ count: %d, Format rejects: %d\n",
