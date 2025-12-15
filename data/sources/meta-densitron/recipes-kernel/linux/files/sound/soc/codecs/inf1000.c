@@ -3912,6 +3912,11 @@ static int densitron_audio_platform_probe(struct platform_device *pdev)
 static int densitron_audio_platform_remove(struct platform_device *pdev)
 {
     struct densitron_audio_priv *priv = platform_get_drvdata(pdev);
+
+    /* Mark as uninitialized for potential rebind */
+    mutex_lock(&priv->hw_lock);
+    priv->hardware_initialized = false;
+    mutex_unlock(&priv->hw_lock);
     
     /* Remove sysfs interface */
     sysfs_remove_group(&pdev->dev.kobj, &densitron_audio_attr_group);
@@ -3962,4 +3967,4 @@ module_platform_driver(densitron_audio_platform_driver);
 MODULE_DESCRIPTION("Densitron INF1000 Audio ASoC Driver");
 MODULE_AUTHOR("Gian Luca Bernocchi <gianluca.bernocchi@quixant.com>");
 MODULE_LICENSE("GPL");
-MODULE_VERSION("4.12");
+MODULE_VERSION("4.13");
