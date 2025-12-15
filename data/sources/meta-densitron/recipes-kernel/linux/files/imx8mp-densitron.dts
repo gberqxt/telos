@@ -9,7 +9,7 @@
 #include "imx8mp.dtsi"
 
 / {
-	model = "NXP i.MX8MPlus - Densitron v1.1 ";
+	model = "NXP i.MX8MPlus - Densitron v1.2 ";
 	compatible = "fsl,imx8mp-evk", "fsl,imx8mp";
 
 	aliases {
@@ -114,6 +114,15 @@
 		regulator-always-on;
 	};
 
+	reg_usb_switch: regulator-usb-switch {
+		compatible = "regulator-fixed";
+		regulator-name = "usb-switch-en";
+		gpio = <&gpio2 3 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		regulator-always-on;
+		regulator-boot-on;
+	};
+ 
 	reg_audio_pwr: regulator-audio-pwr {
 		compatible = "regulator-fixed";
 		regulator-name = "audio-pwr";
@@ -1215,6 +1224,9 @@ deninf: deninf-codec {
 */
 
 &usb3_phy0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_usb_reset>;
+	reset-gpios = <&gpio4 18 GPIO_ACTIVE_LOW>;
 	fsl,phy-tx-vref-tune = <0xe>;
 	fsl,phy-tx-preemp-amp-tune = <3>;
 	fsl,phy-tx-vboost-level = <5>;
@@ -1226,6 +1238,7 @@ deninf: deninf-codec {
 
 &usb3_0 {
 	status = "okay";
+	vbus-supply = <&reg_usb_switch>;
 	connector {
 		compatible = "usb-a-connector";
 		vbus-supply = <&reg_usb1_vbus>;
@@ -1592,6 +1605,15 @@ deninf: deninf-codec {
 			MX8MP_IOMUXC_GPIO1_IO14__USB2_PWR		0x10
 		>;
 	};
+	
+	pinctrl_usb_reset: usbresetgrp {
+		fsl,pins = <
+        		MX8MP_IOMUXC_SAI1_TXD6__GPIO4_IO18    0x19
+        		MX8MP_IOMUXC_SD1_DATA1__GPIO2_IO03    0x19
+    		>;
+	};
+		
+	
 /*
 	pinctrl_uart3: uart3grp {
 		fsl,pins = <
