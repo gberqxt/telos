@@ -9,7 +9,7 @@
 #include "imx8mp.dtsi"
 
 / {
-	model = "NXP i.MX8MPlus - Densitron v1.2 ";
+	model = "NXP i.MX8MPlus - Densitron v1.3 ";
 	compatible = "fsl,imx8mp-evk", "fsl,imx8mp";
 
 	aliases {
@@ -1608,7 +1608,6 @@ deninf: deninf-codec {
 	
 	pinctrl_usb_reset: usbresetgrp {
 		fsl,pins = <
-        		MX8MP_IOMUXC_SAI1_TXD6__GPIO4_IO18    0x19
         		MX8MP_IOMUXC_SD1_DATA1__GPIO2_IO03    0x19
     		>;
 	};
