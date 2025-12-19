@@ -315,15 +315,15 @@ struct volume_map_point {
 };
 
 static const struct volume_map_point tas5733_volume_map[] = {
-    { 100, 5000, 115 },   /* 5W at 100% */
-    { 80,  4000, 145 },   /* 4W at 80% */
-    { 60,  3000, 157 },   /* 3W at 60% */
-    { 40,  2000, 170 },   /* 2W at 40% */
-    { 20,  1000, 195 },   /* 1W at 20% */
-    { 10,  500,  220 },   /* 0.5W at 10% */
-    { 5,   100,  278 },   /* 0.1W at 5% */
-    { 1,   0,    350 },   /* 0W at 0% (near mute) */
-    { 0,   0,  65535 },   /* TODO:Use soft mute instead of register value */
+    { 100, 5120, 139 },   /* 5.12W at 100% */
+    { 80,  4096, 165 },   /* 4.096W at 80% */
+    { 60,  3072, 191 },   /* 3.072W at 60% */
+    { 40,  2048, 218 },   /* 2.048W at 40% */
+    { 20,  1024, 244 },   /* 1.024W at 20% */
+    { 10,   512, 270 },   /* 0.512W at 10% */
+    { 5,    256, 297 },   /* 0.256W at 5% */
+    { 1,      0, 350 },   /* 0W at 1% (near mute) */
+    { 0,      0, 65535 }, /* Mute */
 };
 
 #define TAS5733_VOLUME_MAP_SIZE ARRAY_SIZE(tas5733_volume_map)
