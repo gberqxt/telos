@@ -1,13 +1,13 @@
 FILESEXTRAPATHS:prepend := "${THISDIR}/${PN}:"
 
 SRC_URI:append = " \
-    file://eth0.network \
-    file://eth1.network \
+    file://10-eth0.network \
+    file://10-eth1.network \
 "
 
 FILES:${PN}:append = " \
-    ${sysconfdir}/systemd/network/eth0.network \
-    ${sysconfdir}/systemd/network/eth1.network \
+    ${sysconfdir}/systemd/network/10-eth0.network \
+    ${sysconfdir}/systemd/network/10-eth1.network \
 "
 
 do_install:append() {
