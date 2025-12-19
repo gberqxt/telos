@@ -1,0 +1,13 @@
+[Unit]
+Description=Ethernet MAC and LED Configuration
+After=network-pre.target
+Before=network.target
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/lancfg.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,12 @@
+[Match]
+Name=eth0
+
+[Network]
+DHCP=yes
+LinkLocalAddressing=no
+
+[DHCP]
+UseDNS=yes
+UseRoutes=yes
+RouteMetric=100
+
