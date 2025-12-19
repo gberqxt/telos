@@ -12,7 +12,7 @@ FILES:${PN}:append = " \
 
 do_install:append() {
     install -d ${D}${sysconfdir}/systemd/network
-    install -m 0644 ${WORKDIR}/eth0.network ${D}${sysconfdir}/systemd/network/
-    install -m 0644 ${WORKDIR}/eth1.network ${D}${sysconfdir}/systemd/network/
+    install -m 0644 ${WORKDIR}/10-eth0.network ${D}${sysconfdir}/systemd/network/
+    install -m 0644 ${WORKDIR}/10-eth1.network ${D}${sysconfdir}/systemd/network/
 }
 
