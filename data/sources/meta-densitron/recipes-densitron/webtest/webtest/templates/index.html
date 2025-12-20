@@ -1,0 +1,3000 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Interface Control</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 12px;
+            background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        h1 {
+            color: white;
+            text-align: center;
+            margin: 0;
+            padding: 18px 20px;
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            font-size: 22px;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+        }
+        .version-info {
+            background: #f8fafc;
+            padding: 10px 16px;
+            border-bottom: 1px solid #e2e8f0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+        }
+        .version-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 10px;
+            background: white;
+            border-radius: 4px;
+            border: 1px solid #e2e8f0;
+        }
+        .version-label {
+            font-weight: 600;
+            color: #64748b;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .version-value {
+            color: #475569;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .section {
+            margin: 0;
+            padding: 18px;
+            border-bottom: 1px solid #e2e8f0;
+            background: white;
+        }
+        .section:last-child { border-bottom: none; }
+        .section h2 {
+            margin: 0 0 14px 0;
+            color: #1e293b;
+            font-size: 15px;
+            font-weight: 600;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #475569;
+            display: inline-block;
+        }
+        .rotary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+        }
+        .rotary-card {
+            background: #f8fafc;
+            padding: 14px;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+        }
+        .rotary-card h3 {
+            margin: 0 0 10px 0;
+            font-size: 12px;
+            font-weight: 600;
+            text-align: center;
+        }
+        .led-preview {
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            border: 3px solid #e2e8f0;
+            background: #000;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            transition: all 0.2s;
+        }
+        .led-control {
+            display: grid;
+            grid-template-columns: 18px 1fr 28px;
+            gap: 6px;
+            align-items: center;
+            margin: 4px 0;
+        }
+        .led-control label {
+            font-weight: 600;
+            font-size: 11px;
+            color: #475569;
+            text-align: right;
+        }
+        .led-control span {
+            text-align: center;
+            font-family: 'Monaco', monospace;
+            font-size: 10px;
+            font-weight: 600;
+            color: #1e293b;
+        }
+        .rotary-display {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            padding: 10px;
+            background: #f8fafc;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+        }
+        .rotary-item {
+            background: white;
+            padding: 6px 8px;
+            border-radius: 4px;
+            border: 1px solid #e2e8f0;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        .rotary-item-label {
+            font-size: 9px;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin-bottom: 2px;
+        }
+        .rotary-item-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1e293b;
+            font-family: 'Monaco', monospace;
+        }
+        .output-card {
+            background: #f8fafc;
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+        }
+        .output-card-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .output-card-header input[type="radio"] {
+            cursor: pointer;
+            width: 16px;
+            height: 16px;
+        }
+        .output-card-header label {
+            cursor: pointer;
+            margin: 0;
+            font-weight: 600;
+            color: #1e293b;
+            font-size: 13px;
+            flex: 1;
+        }
+        .headset-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+        .headset-indicator.plugged {
+            background: #d4edda;
+            color: #155724;
+            border-color: #c3e6cb;
+        }
+        .headset-indicator.unplugged {
+            background: #f8d7da;
+            color: #721c24;
+            border-color: #f5c6cb;
+        }
+        .control-group {
+            display: grid;
+            grid-template-columns: 140px 1fr 55px 100px;
+            gap: 12px;
+            align-items: center;
+            margin: 7px 0;
+            padding: 9px;
+            background: #f8fafc;
+            border-radius: 4px;
+        }
+        .control-group label {
+            font-weight: 500;
+            color: #475569;
+            font-size: 13px;
+        }
+        .reg-input {
+            font-family: 'Monaco', monospace;
+            font-size: 11px;
+            font-weight: 600;
+            color: #1e293b;
+            padding: 4px 6px;
+            background: white;
+            border: 1px solid #cbd5e0;
+            border-radius: 4px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .reg-input:hover {
+            border-color: #475569;
+            background: #f8fafc;
+        }
+        .reg-input:focus {
+            outline: none;
+            border-color: #475569;
+            background: white;
+        }
+        .control-group-with-checkbox {
+            display: grid;
+            grid-template-columns: auto 90px 1fr 55px 100px;
+            gap: 10px;
+            align-items: center;
+            margin: 7px 0;
+            padding: 9px;
+            background: #f8fafc;
+            border-radius: 4px;
+        }
+        .control-group-with-checkbox input[type="checkbox"] {
+            cursor: pointer;
+            width: 16px;
+            height: 16px;
+        }
+        .control-group-with-checkbox label {
+            font-weight: 500;
+            color: #475569;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .slider {
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: #e2e8f0;
+            outline: none;
+            transition: background 0.2s;
+        }
+        .slider:hover { background: #cbd5e0; }
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #475569;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+            transition: all 0.2s;
+        }
+        .slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            background: #334155;
+        }
+        .slider::-moz-range-thumb {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #475569;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+        .value-display {
+            text-align: center;
+            font-family: 'Monaco', monospace;
+            font-weight: 600;
+            color: #1e293b;
+            font-size: 12px;
+            background: white;
+            padding: 4px 6px;
+            border-radius: 4px;
+            border: 1px solid #e2e8f0;
+        }
+        .btn {
+            padding: 9px 18px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin: 3px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+        }
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.18);
+        }
+        .btn:active { transform: translateY(0); }
+        .btn-primary {
+            background: #475569;
+            color: white;
+        }
+        .btn-primary:hover { background: #334155; }
+        .btn-success {
+            background: #475569;
+            color: white;
+        }
+        .btn-success:hover { background: #334155; }
+        .btn-danger {
+            background: #dc2626;
+            color: white;
+        }
+        .btn-danger:hover { background: #991b1b; }
+        .btn-delete {
+            background: #dc2626;
+            color: white;
+        }
+        .btn-delete:hover { background: #991b1b; }
+        .btn-warning {
+            background: #475569;
+            color: white;
+        }
+        .btn-warning:hover { background: #334155; }
+        .btn-backup {
+            background: #475569;
+            color: white;
+        }
+        .btn-backup:hover { background: #334155; }
+        .record-play-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 14px;
+        }
+        .record-play-card {
+            background: #f8fafc;
+            padding: 14px;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+        }
+        .record-play-card h3 {
+            margin: 0 0 12px 0;
+            font-size: 13px;
+            font-weight: 600;
+            color: #1e293b;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .record-play-card > div {
+            margin-bottom: 10px;
+        }
+        .record-play-card label {
+            display: block;
+            font-size: 11px;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin-bottom: 4px;
+        }
+        .record-play-card input[type="text"],
+        .record-play-card select {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #cbd5e0;
+            border-radius: 4px;
+            font-size: 13px;
+            background: white;
+            color: #1e293b;
+        }
+        .status-text {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #718096;
+            text-align: center;
+            font-style: italic;
+        }
+        .status-message {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 14px 20px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 13px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        .status-message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status-message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .drop-zone {
+            border: 2px dashed #cbd5e0;
+            border-radius: 6px;
+            padding: 30px 20px;
+            text-align: center;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 6px;
+        }
+        .drop-zone:hover {
+            border-color: #475569;
+            background: #f8fafc;
+        }
+        .drop-zone.drag-over {
+            border-color: #475569;
+            background: #e0e7ff;
+            border-style: solid;
+        }
+        .drop-zone-icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+        .drop-zone-text {
+            color: #475569;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .drop-zone-hint {
+            color: #94a3b8;
+            font-size: 12px;
+        }
+        .hp-status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 8px;
+            border: 1px solid;
+            transition: all 0.2s;
+        }
+        .hp-status-badge.connected {
+            background: #d1fae5;
+            color: #065f46;
+            border-color: #a7f3d0;
+        }
+        .hp-status-badge.disconnected {
+            background: #f3f4f6;
+            color: #6b7280;
+            border-color: #e5e7eb;
+        }
+        .hp-status-badge .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .hp-status-badge.connected .status-dot {
+            background: #10b981;
+        }
+        .hp-status-badge.disconnected .status-dot {
+            background: #9ca3af;
+        }
+        .threshold-control-row {
+            margin: 8px 0 4px 0;
+            padding: 8px 10px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            border: 1px solid #cbd5e0;
+            display: grid;
+            grid-template-columns: 130px 1fr 55px 100px;
+            gap: 10px;
+            align-items: center;
+        }
+        .threshold-control-row label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #475569;
+            white-space: nowrap;
+        }
+        .debug-section {
+            margin: 0;
+            border: none;
+        }
+        .backup-section {
+            text-align: center;
+            padding: 20px 18px;
+        }
+        .backup-section .btn-backup {
+            font-size: 14px;
+            padding: 10px 28px;
+        }
+        .debug-section summary {
+            padding: 10px 14px;
+            background: #f1f5f9;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            color: #475569;
+            user-select: none;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        .debug-section summary:hover {
+            background: #e2e8f0;
+        }
+        .debug-content {
+            padding: 14px;
+            background: #f8fafc;
+        }
+        .debug-controls {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .debug-controls select,
+        .debug-controls input,
+        .debug-controls button {
+            padding: 6px 10px;
+            border: 1px solid #cbd5e0;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .debug-controls select {
+            min-width: 200px;
+        }
+        .debug-controls button {
+            background: #6c757d;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .debug-controls button:hover {
+            background: #5a6268;
+        }
+        .debug-result {
+            padding: 10px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            font-family: 'Monaco', monospace;
+            font-size: 11px;
+            min-height: 20px;
+            color: #475569;
+        }
+        .debug-subsection {
+            margin-top: 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            background: white;
+        }
+        .debug-subsection summary {
+            padding: 8px 12px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 12px;
+            color: #64748b;
+            user-select: none;
+            background: #f8fafc;
+            border-radius: 4px;
+        }
+        .debug-subsection summary:hover {
+            background: #f1f5f9;
+        }
+        .debug-viz-content {
+            padding: 12px;
+        }
+        .debug-viz-controls {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+        .debug-viz-controls button {
+            padding: 5px 12px;
+            background: #475569;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .debug-viz-controls button:hover {
+            background: #334155;
+        }
+        .debug-viz-result {
+            padding: 10px;
+            background: #1e293b;
+            color: #e2e8f0;
+            border-radius: 4px;
+            font-family: 'Monaco', monospace;
+            font-size: 10px;
+            line-height: 1.5;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            margin: 0;
+        }
+        
+        /* Responsive adjustments for narrow screens */
+        @media (max-width: 500px) {
+            .control-group {
+                grid-template-columns: 80px 1fr 50px 85px;
+                gap: 8px;
+                padding: 7px;
+            }
+            .control-group label {
+                font-size: 12px;
+            }
+            .value-display {
+                font-size: 11px;
+                padding: 3px 5px;
+            }
+            .reg-input {
+                font-size: 10px;
+                padding: 3px 4px;
+            }
+            .threshold-control-row {
+                grid-template-columns: 95px 1fr 50px 85px;
+                gap: 8px;
+                padding: 7px;
+            }
+            .threshold-control-row label {
+                font-size: 9px;
+                white-space: nowrap;
+            }
+            .hp-status-badge {
+                font-size: 10px;
+                padding: 2px 8px;
+                margin-left: 4px;
+            }
+            .hp-status-badge .status-dot {
+                width: 6px;
+                height: 6px;
+            }
+            .control-group-with-checkbox {
+                grid-template-columns: auto 70px 1fr 50px 85px;
+                gap: 8px;
+                padding: 7px;
+            }
+            .control-group-with-checkbox label {
+                font-size: 12px;
+            }
+        }
+        
+        @media (max-width: 350px) {
+            .control-group {
+                grid-template-columns: 1fr;
+                gap: 6px;
+                text-align: center;
+            }
+            .control-group label {
+                font-size: 11px;
+            }
+            .reg-input {
+                width: 80px;
+                margin: 0 auto;
+            }
+            .threshold-control-row {
+                grid-template-columns: 1fr;
+                gap: 6px;
+                text-align: center;
+            }
+            .threshold-control-row label {
+                font-size: 11px;
+            }
+            .hp-status-badge {
+                font-size: 9px;
+                padding: 2px 6px;
+            }
+            .control-group-with-checkbox {
+                grid-template-columns: 1fr;
+                gap: 6px;
+                text-align: center;
+            }
+        }
+        
+        .full-view-button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-block;
+        }
+        
+        .full-view-button:hover {
+            background: #2563eb;
+        }
+        
+        .full-view-button:active {
+            transform: scale(0.98);
+        }
+        
+        .test-toggle-button {
+            background: #6b7280;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-block;
+            margin-left: 16px;
+        }
+        
+        .test-toggle-button:hover {
+            background: #4b5563;
+        }
+        
+        .test-toggle-button.active {
+            background: #dc2626;
+        }
+        
+        .test-toggle-button.active:hover {
+            background: #b91c1c;
+        }
+        
+        .test-toggle-button:active {
+            transform: scale(0.98);
+        }
+        
+        .full-view-container {
+            display: inline-block;
+            margin-left: 12px;
+        }
+        
+        
+    </style>
+</head>
+<body>
+    <!-- Loading overlay -->
+    <div id="loadingOverlay" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+        color: white;
+    ">
+        <div style="font-size: 24px; font-weight: 600; margin-bottom: 20px;">
+            Audio Interface Loading...
+        </div>
+        <div style="font-size: 14px; color: #94a3b8; margin-bottom: 30px;">
+            Initializing hardware and GUI...
+        </div>
+        <div style="
+            width: 300px;
+            height: 4px;
+            background: #475569;
+            border-radius: 2px;
+            overflow: hidden;
+        ">
+            <div id="loadingBar" style="
+                width: 0%;
+                height: 100%;
+                background: linear-gradient(90deg, #3b82f6, #60a5fa);
+                transition: width 0.3s ease;
+            "></div>
+        </div>
+        <div id="loadingStatus" style="font-size: 12px; color: #64748b; margin-top: 15px;">
+            Please wait...
+        </div>
+    </div>
+    
+    <div class="container">
+        <h1>Audio Interface Control</h1>
+        
+        <div class="version-info">
+            <div class="version-item">
+                <span class="version-label">App Version</span>
+                <span class="version-value" id="appVersion">Loading...</span>
+            </div>
+            <div class="version-item">
+                <span class="version-label">FPGA Version</span>
+                <span class="version-value" id="fpgaVersion">Loading...</span>
+            </div>
+            <div class="version-item">
+                <span class="version-label">DTS Model</span>
+                <span class="version-value" id="dtsModel">Loading...</span>
+            </div>
+            <div class="version-item">
+                <span class="version-label">Driver Version</span>
+                <span class="version-value" id="driverVersion">Loading...</span>
+            </div>
+            
+        </div>
+
+        <div class="section">
+            <h2>Rotary Controls</h2>
+            <div class="rotary-grid">
+                <div class="rotary-card">
+                    <h3 style="color: #475569;">Left Rotary and LED</h3>
+                    <div style="display: flex; gap: 12px; align-items: center; justify-content: center; margin-bottom: 10px;">
+                        <!-- HTML Color Input -->
+                        <div style="text-align: center;">
+                            <div style="font-size: 10px; color: #64748b; margin-bottom: 4px; font-weight: 600;">HTML COLOR</div>
+                            <div style="display: flex; align-items: center; gap: 2px;">
+                                <span style="font-family: 'Monaco', monospace; font-size: 14px; font-weight: 700; color: #475569;">#</span>
+                                <input type="text" id="led2HtmlColor" maxlength="6" value="000000" style="font-family: 'Monaco', monospace; font-size: 14px; font-weight: 700; color: #1e293b; padding: 6px 8px; background: white; border: 1px solid #cbd5e0; border-radius: 4px; width: 80px; text-transform: uppercase;" onchange="applyHtmlColor(2)">
+                            </div>
+                        </div>
+                        
+                        <!-- LED Preview -->
+                        <div class="led-preview" id="led2Preview"></div>
+                        <!-- RGB Sliders -->
+                        <div style="flex: 1; max-width: 180px;">
+                            <div class="led-control">
+                                <label>R:</label>
+                                <input type="range" min="0" max="255" value="0" class="slider" id="led2R">
+                                <span id="led2RVal">00</span>
+                            </div>
+                            <div class="led-control">
+                                <label>G:</label>
+                                <input type="range" min="0" max="255" value="0" class="slider" id="led2G">
+                                <span id="led2GVal">00</span>
+                            </div>
+                            <div class="led-control">
+                                <label>B:</label>
+                                <input type="range" min="0" max="255" value="0" class="slider" id="led2B">
+                                <span id="led2BVal">00</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="rotary-display">
+                        <div class="rotary-item">
+                            <div class="rotary-item-label">Position</div>
+                            <div class="rotary-item-value" id="rot1Position">0</div>
+                        </div>
+                        <div class="rotary-item">
+                            <div class="rotary-item-label">Delta</div>
+                            <div class="rotary-item-value" id="rot1Delta" style="color: #475569;">0</div>
+                        </div>
+                        <div class="rotary-item" id="btn1Container">
+                            <div class="rotary-item-label">Button 1</div>
+                            <div class="rotary-item-value" id="btn1State" style="font-size: 11px;">Released</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rotary-card">
+                    <h3 style="color: #475569;">Right Rotary and LED</h3>
+                    <div style="display: flex; gap: 12px; align-items: center; justify-content: center; margin-bottom: 10px;">
+                        <!-- HTML Color Input -->
+                        <div style="text-align: center;">
+                            <div style="font-size: 10px; color: #64748b; margin-bottom: 4px; font-weight: 600;">HTML COLOR</div>
+                            <div style="display: flex; align-items: center; gap: 2px;">
+                                <span style="font-family: 'Monaco', monospace; font-size: 14px; font-weight: 700; color: #475569;">#</span>
+                                <input type="text" id="led1HtmlColor" maxlength="6" value="000000" style="font-family: 'Monaco', monospace; font-size: 14px; font-weight: 700; color: #1e293b; padding: 6px 8px; background: white; border: 1px solid #cbd5e0; border-radius: 4px; width: 80px; text-transform: uppercase;" onchange="applyHtmlColor(1)">
+                            </div>
+                        </div>
+                        
+                        <!-- LED Preview -->
+                        <div class="led-preview" id="led1Preview"></div>
+                        <!-- RGB Sliders -->
+                        <div style="flex: 1; max-width: 180px;">
+                            <div class="led-control">
+                                <label>R:</label>
+                                <input type="range" min="0" max="255" value="0" class="slider" id="led1R">
+                                <span id="led1RVal">00</span>
+                            </div>
+                            <div class="led-control">
+                                <label>G:</label>
+                                <input type="range" min="0" max="255" value="0" class="slider" id="led1G">
+                                <span id="led1GVal">00</span>
+                            </div>
+                            <div class="led-control">
+                                <label>B:</label>
+                                <input type="range" min="0" max="255" value="0" class="slider" id="led1B">
+                                <span id="led1BVal">00</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="rotary-display">
+                        <div class="rotary-item">
+                            <div class="rotary-item-label">Position</div>
+                            <div class="rotary-item-value" id="rot2Position">0</div>
+                        </div>
+                        <div class="rotary-item">
+                            <div class="rotary-item-label">Delta</div>
+                            <div class="rotary-item-value" id="rot2Delta" style="color: #475569;">0</div>
+                        </div>
+                        <div class="rotary-item" id="btn2Container">
+                            <div class="rotary-item-label">Button 0</div>
+                            <div class="rotary-item-value" id="btn2State" style="font-size: 11px;">Released</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Volume Controls & Audio Routing</h2>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
+                <div class="output-card">
+                    <div class="output-card-header">
+                        <input type="radio" name="audioPath" id="pathSpeaker" value="Speakers" checked>
+                        <label for="pathSpeaker">Speaker Output</label>
+                    </div>
+                    <div class="control-group" style="margin: 5px 0;">
+                        <label>Left</label>
+                        <input type="range" min="0" max="100" value="50" class="slider" id="speakerLeft">
+                        <span class="value-display" id="speakerLeftVal">50</span>
+                        <input type="text" class="reg-input" id="speakerLeftReg" value="0x0000" maxlength="6" onchange="applyRegValue('speakerLeft', this.value, 16)">
+                    </div>
+                    <div class="control-group" style="margin: 5px 0;">
+                        <label>Right</label>
+                        <input type="range" min="0" max="100" value="50" class="slider" id="speakerRight">
+                        <span class="value-display" id="speakerRightVal">50</span>
+                        <input type="text" class="reg-input" id="speakerRightReg" value="0x0000" maxlength="6" onchange="applyRegValue('speakerRight', this.value, 16)">
+                    </div>
+                </div>
+
+                <div class="output-card">
+                    <div class="output-card-header">
+                        <input type="radio" name="audioPath" id="pathHeadphone" value="Headphones">
+                        <label for="pathHeadphone">Headphone Output</label>
+                        <span id="hpStatusBadge" class="hp-status-badge disconnected">
+                            <span class="status-dot"></span>
+                            <span id="hpStatusText">Disconnected</span>
+                        </span>
+                    </div>
+                    <div class="control-group" style="margin: 5px 0;">
+                        <label>Left</label>
+                        <input type="range" min="0" max="100" value="75" class="slider" id="hpLeft">
+                        <span class="value-display" id="hpLeftVal">75</span>
+                        <input type="text" class="reg-input" id="hpLeftReg" value="0x00" maxlength="4" onchange="applyRegValue('hpLeft', this.value, 8)">
+                    </div>
+                    <div class="control-group" style="margin: 5px 0;">
+                        <label>Right</label>
+                        <input type="range" min="0" max="100" value="75" class="slider" id="hpRight">
+                        <span class="value-display" id="hpRightVal">75</span>
+                        <input type="text" class="reg-input" id="hpRightReg" value="0x00" maxlength="4" onchange="applyRegValue('hpRight', this.value, 8)">
+                    </div>
+                    <div class="threshold-control-row">
+                        <label>Threshold Detection</label>
+                        <input type="range" min="0" max="255" value="80" class="slider" id="hpThreshold">
+                        <span class="value-display" id="hpThresholdVal">80</span>
+                        <input type="text" class="reg-input" id="hpThresholdReg" value="0x50" maxlength="4" 
+                               onchange="applyThresholdReg(this.value)">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Microphone Inputs</h2>
+            
+            <div class="control-group-with-checkbox">
+                <input type="checkbox" id="micSourceFront" checked>
+                <label for="micSourceFront">Front Mic</label>
+                <input type="range" min="0" max="100" value="50" class="slider" id="micFront">
+                <span class="value-display" id="micFrontVal">50</span>
+                <input type="text" class="reg-input" id="micFrontReg" value="0x00" maxlength="4" onchange="applyRegValue('micFront', this.value, 8)">
+            </div>
+            <div class="control-group-with-checkbox">
+                <input type="checkbox" id="micSourceHeadset">
+                <label for="micSourceHeadset">Headset Mic</label>
+                <input type="range" min="0" max="100" value="50" class="slider" id="micHeadset">
+                <span class="value-display" id="micHeadsetVal">50</span>
+                <input type="text" class="reg-input" id="micHeadsetReg" value="0x00" maxlength="4" onchange="applyRegValue('micHeadset', this.value, 8)">
+            </div>
+        </div>
+
+
+
+
+        <div class="section">
+            <h2>Record & Play Audio</h2>
+            
+            <div style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 16px;">
+                <h3 style="margin: 0; font-size: 13px; font-weight: 600; color: #475569;">Audio Loop Test</h3>
+                <button class="btn btn-warning" id="btnLoopTest" style="padding: 6px 14px; font-size: 12px;">Start Loop Test</button>
+                <div class="status-text" id="loopTestStatus" style="margin: 0; font-size: 12px;">Ready</div>
+            </div>
+
+            <div class="record-play-grid" style="margin-bottom: 16px;">
+                <div class="record-play-card">
+                    <h3>● Record</h3>
+                    <div>
+                        <label>Filename</label>
+                        <input type="text" id="recordFilename" value="recording.wav">
+                    </div>
+                    <button class="btn btn-danger" id="btnRecord">Start Recording</button>
+                    <div class="status-text" id="recordStatus">Ready to record</div>
+                </div>
+
+                <div class="record-play-card">
+                    <h3>▶ Play</h3>
+                    <div>
+                        <label>Select File</label>
+                        <select id="playFileSelect">
+                            <option value="">Loading files...</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-success" id="btnPlay">Play</button>
+                    <div class="status-text" id="playStatus">Select a file to play</div>
+                </div>
+            </div>
+
+            <div class="record-play-grid">
+                <div class="record-play-card">
+                    <h3>↓ Download Recorded Files</h3>
+                    <div>
+                        <label>Select File to Download</label>
+                        <select id="downloadFileSelect">
+                            <option value="">Loading files...</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" id="btnDownload">Download File</button>
+                    <button class="btn btn-delete" onclick="deleteSelectedFile()">Delete File</button>
+                    <div class="status-text" id="downloadStatus">Select a file to download</div>
+                </div>
+
+                <div class="record-play-card">
+                    <h3>↑ Upload WAV Files</h3>
+                    <div>
+                        <div class="drop-zone" id="dropZone">
+                            <div class="drop-zone-icon">📁</div>
+                            <div class="drop-zone-text">Drag & drop WAV file</div>
+                            <div class="drop-zone-hint">or click to browse</div>
+                        </div>
+                        <input type="file" id="fileUpload" accept=".wav,audio/wav" style="display: none;">
+                    </div>
+                    <div class="status-text" id="uploadStatus">Ready to upload</div>
+                </div>
+            </div>
+        </div>
+
+
+
+
+
+        <div class="section">
+            <h2>Physical Display Representation
+                <span class="full-view-container">
+                    <button class="full-view-button" onclick="openFullView()">Open Full View</button>
+                </span>
+            </h2>
+            <div style="background: #f8fafc; padding: 16px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <div style="font-size: 12px; color: #64748b; font-weight: 600;">
+                        Physical Display: 2848 × 280 px (scaled to fit)
+                    </div>
+                    <div style="font-size: 11px; color: #94a3b8;">
+                        <span style="color: #1e88e5;">●</span> Blue = Ready
+                        <span style="margin: 0 8px;"></span>
+                        <span style="color: #fdd835;">●</span> Yellow = Pressed
+                    </div>
+                </div>
+                <div style="overflow-x: auto; background: #1e293b; border-radius: 4px; padding: 8px;">
+                    <canvas id="displayCanvas" width="2848" height="280" style="width: 100%; max-width: 1400px; height: auto; display: block; image-rendering: crisp-edges;"></canvas>
+                </div>
+            </div>
+            
+            
+            <details class="debug-subsection" open>
+                <summary>Button Event Log</summary>
+                    <div id="eventLogContent" style="font-family: 'Courier New', monospace; font-size: 11px; max-height: 200px; overflow-y: auto; padding: 8px 0;">
+        <div style="font-family: 'Monaco', monospace; font-size: 11px; background: #1e293b; color: #e2e8f0; padding: 12px; border-radius: 4px; max-height: 300px; overflow-y: auto;" id="eventLog">
+                            <div style="color: #94a3b8; font-style: italic;">Waiting for button events...</div>
+                        </div>
+                </div>
+            </details>
+
+        </div>
+
+
+        <div class="section">
+            <details class="debug-section">
+                <summary>Debug / Register Access</summary>
+                <div class="debug-content">
+                    <div class="debug-controls">
+                        <select id="sysfsAttr">
+                            <option value="fpga_fw_version">fpga_fw_version</option>
+                            <option value="fpga_status">fpga_status</option>
+                            <option value="fpga_hp_threshold">fpga_hp_threshold</option>
+                            <option value="rotary_position">rotary_position</option>
+                            <option value="headphones_connected">headphones_connected</option>
+                            <option value="pcm1748_left_volume">pcm1748_left_volume</option>
+                            <option value="pcm1748_right_volume">pcm1748_right_volume</option>
+                            <option value="pcm1748_mute">pcm1748_mute</option>
+                        </select>
+                        <button onclick="refreshSysfsAttrs()">↻</button>
+                        <button onclick="readSysfsAttr()">Read</button>
+                        <input type="text" id="sysfsValue" placeholder="Value" style="width: 150px;">
+                        <button onclick="writeSysfsAttr()">Write</button>
+                    </div>
+                    <div class="debug-result" id="debugResult">Select attribute and click Read</div>
+                    
+                    <!-- Nested sysfs visualization -->
+                    <details class="debug-subsection" style="margin-top: 12px;">
+                        <summary>SYSFS Data Visualization</summary>
+                        <div class="debug-viz-content">
+                            <div class="debug-viz-controls">
+                                <button onclick="loadFpgaDump()">FPGA Registers</button>
+                                <button onclick="loadPcm1748Dump()">PCM1748 Dump</button>
+                                <button onclick="loadSystemStatus()">System Status</button>
+                                <button onclick="loadAllRegisters()">All Registers</button>
+                            </div>
+                            <pre class="debug-viz-result" id="vizResult">Click a button to load register data</pre>
+                        </div>
+                    </details>
+                </div>
+            </details>
+        </div>
+
+        <div class="section">
+            <details class="debug-section">
+                <summary>Connector Test (CN5/CN6)</summary>
+                <div class="debug-content">
+                    <div style="margin-bottom: 12px;">
+                        <p style="font-size: 11px; color: #64748b; margin-bottom: 8px;">
+                            Tests CN5 (SAI, Reset) and CN6 (SPI, I2C, Interrupt) connections
+                        </p>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <button class="btn btn-primary" id="btnConnectorTest" onclick="runConnectorTest()" style="width: 200px;">
+                                Run Connectors Test
+                            </button>
+                            <div id="connectorTestStatus" style="font-size: 13px; font-weight: 600; padding: 6px 14px; border-radius: 4px; background: #f1f5f9; color: #64748b;">
+                                Not run
+                            </div>
+                        </div>
+                    </div>
+                    <div class="debug-result" id="connectorTestResult" style="font-family: 'Monaco', monospace; font-size: 11px; white-space: pre-wrap; max-height: 400px; overflow-y: auto;">
+                        Click "Run Connectors Test" to start
+                    </div>
+                </div>
+            </details>
+        </div>
+
+        <div class="section backup-section">
+            <button class="btn btn-backup" onclick="backupTestif()">Backup testif Directory</button>           
+        </div>
+        
+        <div class="card">
+            <div style="padding: 12px;">
+                <label style="display: flex; align-items: center; cursor: pointer; margin-bottom: 8px;">
+                    <input type="checkbox" id="autostartCheckbox" style="margin-right: 8px;">
+                    <span>Run automatically at startup</span>
+                </label>
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" id="wavipCheckbox" style="margin-right: 8px;">
+                    <span>Play IP address at startup</span>
+                </label>
+            </div>
+        </div>
+        
+        <div id="statusMessage"></div>
+    </div>
+
+    <script>
+        const API_BASE = '';
+        let updateInterval, rotaryInterval;
+
+        async function loadVersionInfo() {
+            try {
+                const response = await fetch(`${API_BASE}/api/version`);
+                const data = await response.json();
+                document.getElementById('appVersion').textContent = data.app_version;
+                document.getElementById('fpgaVersion').textContent = data.fpga_version;
+                document.getElementById('dtsModel').textContent = data.dts_model;
+                document.getElementById('driverVersion').textContent = data.driver_version;
+            } catch (error) {
+                console.error('Error loading version:', error);
+            }
+        }
+
+        async function updateStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/api/read`);
+                if (!response.ok) {
+                    console.error('updateStatus: HTTP error', response.status);
+                    return;
+                }
+                const data = await response.json();
+                console.log('updateStatus: Received data', data);
+
+                if (data.led1_rgb) updateLED(1, data.led1_rgb.r, data.led1_rgb.g, data.led1_rgb.b);
+                if (data.led2_rgb) updateLED(2, data.led2_rgb.r, data.led2_rgb.g, data.led2_rgb.b);
+
+                updateSlider('speakerLeft', 'speakerLeftVal', data.speaker_left_volume);
+                updateSlider('speakerRight', 'speakerRightVal', data.speaker_right_volume);
+                updateSlider('hpLeft', 'hpLeftVal', data.hp_left_volume);
+                updateSlider('hpRight', 'hpRightVal', data.hp_right_volume);
+                updateSlider('micFront', 'micFrontVal', data.mic_front_gain);
+                updateSlider('micHeadset', 'micHeadsetVal', data.mic_headset_gain);
+
+		// FIXME - TODO: implment reg visualization                
+		// Update register displays (estimated from percentage)
+                updateRegisterDisplay('speakerLeftReg', percentToSpeakerReg(data.speaker_left_volume));
+                updateRegisterDisplay('speakerRightReg', percentToSpeakerReg(data.speaker_right_volume));
+                updateRegisterDisplay('hpLeftReg', percentToHeadphoneReg(data.hp_left_volume));
+                updateRegisterDisplay('hpRightReg', percentToHeadphoneReg(data.hp_right_volume));
+                updateRegisterDisplay('micFrontReg', percentToMicReg(data.mic_front_gain));
+                updateRegisterDisplay('micHeadsetReg', percentToMicReg(data.mic_headset_gain));
+
+                if (data.audio_path === 'Speakers') {
+                    document.getElementById('pathSpeaker').checked = true;
+                } else if (data.audio_path === 'Headphones') {
+                    document.getElementById('pathHeadphone').checked = true;
+                }
+                
+                
+                if (data.mic_source === 'None') {
+                    document.getElementById('micSourceFront').checked = false;
+                    document.getElementById('micSourceHeadset').checked = false;        
+                } else if (data.mic_source === 'Front') {
+                    document.getElementById('micSourceFront').checked = true;
+                    document.getElementById('micSourceHeadset').checked = false; 
+                } else if (data.mic_source === 'Headset') {
+                    document.getElementById('micSourceFront').checked = false;
+                    document.getElementById('micSourceHeadset').checked = true; 
+                } else if (data.mic_source === 'Both') {
+                    document.getElementById('micSourceFront').checked = true;
+                    document.getElementById('micSourceHeadset').checked = true; 
+                }
+                
+                
+            } catch (error) {
+                console.error('Error updating status:', error);
+            }
+        }
+
+        function updateRegisterDisplay(regId, value) {
+            const regInput = document.getElementById(regId);
+            if (regInput && !document.activeElement === regInput) {
+                regInput.value = value;
+            }
+        }
+
+        function percentToSpeakerReg(percent) {
+            // TAS5733 volume mapping: 115 (100%) to 600 (0%)
+            // Linear interpolation
+            const regValue = Math.round(115 + (600 - 115) * (100 - percent) / 100);
+            return '0x' + regValue.toString(16).toUpperCase().padStart(4, '0');
+        }
+        
+        function percentToHeadphoneReg(percent) {
+            // PCM1748: 0xFF (0dB) at 100%, 0x00 (mute) at 0%
+            // Formula: 0.5 * (Val - 255) = dB, so Val = 255 + (dB * 2)
+            // Approximate: Val = 255 * (percent / 100)
+            const regValue = Math.round(255 * percent / 100);
+            return '0x' + regValue.toString(16).toUpperCase().padStart(2, '0');
+        }
+        
+        function percentToMicReg(percent) {
+            // Microphone gain: 0x00 (+20dB max) to 0xFF (-107dB min)
+            // Inverted: higher register = lower gain
+            // Approximate linear mapping
+            const regValue = Math.round(255 * (100 - percent) / 100);
+            return '0x' + regValue.toString(16).toUpperCase().padStart(2, '0');
+        }
+
+        async function updateHeadsetStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/api/headset_status`);
+                const data = await response.json();
+                if (data.success) {
+                    const isConnected = data.plugged;
+                    
+                    // Update compact badge
+                    const badge = document.getElementById('hpStatusBadge');
+                    const statusText = document.getElementById('hpStatusText');
+                    
+                    badge.className = 'hp-status-badge ' + (isConnected ? 'connected' : 'disconnected');
+                    statusText.textContent = isConnected ? 'Connected' : 'Disconnected';
+                }
+            } catch (error) {
+                console.error('Error updating headset status:', error);
+            }
+        }
+
+        async function updateHardwareRegisters() {
+            try {
+                // Read TAS5733 volumes
+                const tas5733Left = await fetch(`${API_BASE}/api/registers/read`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({attribute: 'tas5733_left_volume'})
+                });
+                const tas5733LeftData = await tas5733Left.json();
+                
+                const tas5733Right = await fetch(`${API_BASE}/api/registers/read`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({attribute: 'tas5733_right_volume'})
+                });
+                const tas5733RightData = await tas5733Right.json();
+                
+                // Read PCM1748 volumes
+                const pcm1748Left = await fetch(`${API_BASE}/api/registers/read`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({attribute: 'pcm1748_left_volume'})
+                });
+                const pcm1748LeftData = await pcm1748Left.json();
+                
+                const pcm1748Right = await fetch(`${API_BASE}/api/registers/read`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({attribute: 'pcm1748_right_volume'})
+                });
+                const pcm1748RightData = await pcm1748Right.json();
+                
+                // Read FPGA HP threshold
+                const fpgaThreshold = await fetch(`${API_BASE}/api/registers/read`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({attribute: 'fpga_hp_threshold'})
+                });
+                const fpgaThresholdData = await fpgaThreshold.json();
+                
+                // Read FPGA microphone gains
+                const fpgaFrontMic = await fetch(`${API_BASE}/api/registers/read`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({attribute: 'fpga_front_mic_gain'})
+                });
+                const fpgaFrontMicData = await fpgaFrontMic.json();
+                
+                const fpgaHeadsetMic = await fetch(`${API_BASE}/api/registers/read`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({attribute: 'fpga_headset_mic_gain'})
+                });
+                const fpgaHeadsetMicData = await fpgaHeadsetMic.json();
+                
+                // Update TAS5733 register fields
+                if (tas5733LeftData.success && tas5733LeftData.value) {
+                    const leftReg = document.getElementById('speakerLeftReg');
+                    if (leftReg && document.activeElement !== leftReg) {
+                        const hexMatch = tas5733LeftData.value.match(/0x([0-9A-F]+)/i);
+                        if (hexMatch) {
+                            leftReg.value = '0x' + hexMatch[1];
+                        }
+                    }
+                }
+                if (tas5733RightData.success && tas5733RightData.value) {
+                    const rightReg = document.getElementById('speakerRightReg');
+                    if (rightReg && document.activeElement !== rightReg) {
+                        const hexMatch = tas5733RightData.value.match(/0x([0-9A-F]+)/i);
+                        if (hexMatch) {
+                            rightReg.value = '0x' + hexMatch[1];
+                        }
+                    }
+                }
+                
+                // Update PCM1748 register fields
+                if (pcm1748LeftData.success && pcm1748LeftData.value) {
+                    const hpLeftReg = document.getElementById('hpLeftReg');
+                    if (hpLeftReg && document.activeElement !== hpLeftReg) {
+                        const hexMatch = pcm1748LeftData.value.match(/0x([0-9A-F]+)/i);
+                        if (hexMatch) {
+                            hpLeftReg.value = '0x' + hexMatch[1];
+                        }
+                    }
+                }
+                if (pcm1748RightData.success && pcm1748RightData.value) {
+                    const hpRightReg = document.getElementById('hpRightReg');
+                    if (hpRightReg && document.activeElement !== hpRightReg) {
+                        const hexMatch = pcm1748RightData.value.match(/0x([0-9A-F]+)/i);
+                        if (hexMatch) {
+                            hpRightReg.value = '0x' + hexMatch[1];
+                        }
+                    }
+                }
+                
+                // Update FPGA threshold register field
+                if (fpgaThresholdData.success && fpgaThresholdData.value) {
+                    const thresholdReg = document.getElementById('hpThresholdReg');
+                    if (thresholdReg && document.activeElement !== thresholdReg) {
+                        const hexMatch = fpgaThresholdData.value.match(/0x([0-9A-F]+)/i);
+                        if (hexMatch) {
+                            thresholdReg.value = '0x' + hexMatch[1];
+                        }
+                    }
+                }
+                
+                // Update FPGA microphone gain register fields
+                if (fpgaFrontMicData.success && fpgaFrontMicData.value) {
+                    const micFrontReg = document.getElementById('micFrontReg');
+                    if (micFrontReg && document.activeElement !== micFrontReg) {
+                        const hexMatch = fpgaFrontMicData.value.match(/0x([0-9A-F]+)/i);
+                        if (hexMatch) {
+                            micFrontReg.value = '0x' + hexMatch[1];
+                        }
+                    }
+                }
+                if (fpgaHeadsetMicData.success && fpgaHeadsetMicData.value) {
+                    const micHeadsetReg = document.getElementById('micHeadsetReg');
+                    if (micHeadsetReg && document.activeElement !== micHeadsetReg) {
+                        const hexMatch = fpgaHeadsetMicData.value.match(/0x([0-9A-F]+)/i);
+                        if (hexMatch) {
+                            micHeadsetReg.value = '0x' + hexMatch[1];
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating hardware registers:', error);
+            }
+        }
+
+
+        async function updateDetectionThreshold() {
+            try {
+                // Read from sysfs via registers API
+                const response = await fetch(`${API_BASE}/api/registers/read`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({attribute: 'fpga_hp_threshold'})
+                });
+                const data = await response.json();
+                
+                if (data.success && data.value) {
+                    // Parse value - could be "0x50 (80)" or just "80"
+                    let threshold = 0;
+                    if (data.value.startsWith('0x')) {
+                        threshold = parseInt(data.value.split(' ')[0], 16);
+                    } else {
+                        threshold = parseInt(data.value.split(' ')[0], 10);
+                    }
+                    
+                    const slider = document.getElementById('hpThreshold');
+                    const valueDisplay = document.getElementById('hpThresholdVal');
+                    const regInput = document.getElementById('hpThresholdReg');
+                    
+                    if (slider && !slider.isDragging) {
+                        slider.value = threshold;
+                        if (valueDisplay) valueDisplay.textContent = threshold;
+                    }
+                    if (regInput && document.activeElement !== regInput) {
+                        regInput.value = '0x' + threshold.toString(16).toUpperCase().padStart(2, '0');
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating detection threshold:', error);
+            }
+        }
+
+        async function applyThresholdReg(hexValue) {
+            // Parse hex value
+            let cleanHex = hexValue.replace(/^0x/i, '').replace(/[^0-9A-F]/gi, '');
+            
+            if (!cleanHex) {
+                showStatus('Invalid hex value', true);
+                return;
+            }
+            
+            const threshold = parseInt(cleanHex, 16);
+            
+            if (threshold > 255) {
+                showStatus('Value too large for 8-bit register', true);
+                return;
+            }
+            
+            try {
+                // Write to sysfs via registers API
+                const response = await fetch(`${API_BASE}/api/registers/write`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        attribute: 'fpga_hp_threshold',
+                        value: threshold.toString()
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Update slider and value display
+                    const slider = document.getElementById('hpThreshold');
+                    const valueDisplay = document.getElementById('hpThresholdVal');
+                    if (slider) slider.value = threshold;
+                    if (valueDisplay) valueDisplay.textContent = threshold;
+                    showStatus('Threshold updated', false);
+                } else {
+                    showStatus(`Error: ${result.error}`, true);
+                }
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, true);
+            }
+        }
+
+        async function updateRotaryEncoders() {
+            try {
+                const response = await fetch(`${API_BASE}/api/rotary_status`);
+                const data = await response.json();
+                
+                if (data.success && data.encoders) {
+                    document.getElementById('rot1Position').textContent = data.encoders.rotary1.position;
+                    document.getElementById('rot1Delta').textContent = data.encoders.rotary1.last_delta;
+                    
+                    const btn1State = document.getElementById('btn1State');
+                    const btn1Container = document.getElementById('btn1Container');
+                    const btn1Label = btn1Container.querySelector('.rotary-item-label');
+                    if (data.encoders.rotary1.button_pressed) {
+                        btn1State.textContent = 'PRESSED';
+                        btn1Container.style.background = '#059669';
+                        btn1State.style.color = 'white';
+                        btn1Label.style.color = 'rgba(255,255,255,0.8)';
+                    } else {
+                        btn1State.textContent = 'Released';
+                        btn1Container.style.background = 'white';
+                        btn1State.style.color = '#1e293b';
+                        btn1Label.style.color = '#94a3b8';
+                    }
+                    
+                    document.getElementById('rot2Position').textContent = data.encoders.rotary2.position;
+                    document.getElementById('rot2Delta').textContent = data.encoders.rotary2.last_delta;
+                    
+                    const btn2State = document.getElementById('btn2State');
+                    const btn2Container = document.getElementById('btn2Container');
+                    const btn2Label = btn2Container.querySelector('.rotary-item-label');
+                    if (data.encoders.rotary2.button_pressed) {
+                        btn2State.textContent = 'PRESSED';
+                        btn2Container.style.background = '#059669';
+                        btn2State.style.color = 'white';
+                        btn2Label.style.color = 'rgba(255,255,255,0.8)';
+                    } else {
+                        btn2State.textContent = 'Released';
+                        btn2Container.style.background = 'white';
+                        btn2State.style.color = '#1e293b';
+                        btn2Label.style.color = '#94a3b8';
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating rotary encoders:', error);
+            }
+        }
+
+        function updateLED(ledNum, r, g, b) {
+            const rSlider = document.getElementById(`led${ledNum}R`);
+            const gSlider = document.getElementById(`led${ledNum}G`);
+            const bSlider = document.getElementById(`led${ledNum}B`);
+            const preview = document.getElementById(`led${ledNum}Preview`);
+            const htmlColor = document.getElementById(`led${ledNum}HtmlColor`);
+
+            if (!rSlider.isDragging) {
+                rSlider.value = r;
+                document.getElementById(`led${ledNum}RVal`).textContent = r;
+            }
+            if (!gSlider.isDragging) {
+                gSlider.value = g;
+                document.getElementById(`led${ledNum}GVal`).textContent = g;
+            }
+            if (!bSlider.isDragging) {
+                bSlider.value = b;
+                document.getElementById(`led${ledNum}BVal`).textContent = b;
+            }
+
+            preview.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+
+            const hex = `${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`.toUpperCase();
+            htmlColor.value = hex;
+        }
+
+        async function applyHtmlColor(ledNum) {
+            const htmlColor = document.getElementById(`led${ledNum}HtmlColor`);
+            let hex = htmlColor.value.toUpperCase().replace(/[^0-9A-F]/g, '');
+            
+            // Pad or truncate to 6 characters
+            if (hex.length < 6) {
+                hex = hex.padEnd(6, '0');
+            } else if (hex.length > 6) {
+                hex = hex.substring(0, 6);
+            }
+            
+            htmlColor.value = hex;
+            
+            // Parse RGB values
+            const r = parseInt(hex.substring(0, 2), 16);
+            const g = parseInt(hex.substring(2, 4), 16);
+            const b = parseInt(hex.substring(4, 6), 16);
+            
+            // Update sliders and preview
+            document.getElementById(`led${ledNum}R`).value = r;
+            document.getElementById(`led${ledNum}G`).value = g;
+            document.getElementById(`led${ledNum}B`).value = b;
+            document.getElementById(`led${ledNum}RVal`).textContent = r.toString(16).padStart(2, '0').toUpperCase();
+            document.getElementById(`led${ledNum}GVal`).textContent = g.toString(16).padStart(2, '0').toUpperCase();
+            document.getElementById(`led${ledNum}BVal`).textContent = b.toString(16).padStart(2, '0').toUpperCase();
+            document.getElementById(`led${ledNum}Preview`).style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+            
+            // Send to hardware
+            try {
+                const response = await fetch(`${API_BASE}/api/set_rgb_led`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        led: ledNum,
+                        r: r,
+                        g: g,
+                        b: b
+                    })
+                });
+                const result = await response.json();
+                if (!result.success) {
+                    showStatus(`LED Error: ${result.error}`, true);
+                }
+            } catch (error) {
+                showStatus(`LED Error: ${error.message}`, true);
+            }
+        }
+
+        async function applyRegValue(controlId, hexValue, bitWidth) {
+            // Parse hex value (remove 0x prefix if present)
+            let cleanHex = hexValue.replace(/^0x/i, '').replace(/[^0-9A-F]/gi, '');
+            
+            if (!cleanHex) {
+                showStatus('Invalid hex value', true);
+                return;
+            }
+            
+            // Convert to integer
+            const regValue = parseInt(cleanHex, 16);
+            
+            // Validate bit width
+            const maxValue = bitWidth === 8 ? 0xFF : 0xFFFF;
+            if (regValue > maxValue) {
+                showStatus(`Value too large for ${bitWidth}-bit register`, true);
+                return;
+            }
+            
+            // Determine which control and API endpoint
+            let apiEndpoint, channel, regType;
+            
+            if (controlId.startsWith('speaker')) {
+                apiEndpoint = '/api/set_speaker_volume';
+                channel = controlId.includes('Left') ? 'left' : 'right';
+                regType = 'speaker';
+            } else if (controlId.startsWith('hp')) {
+                apiEndpoint = '/api/set_headphone_volume';
+                channel = controlId.includes('Left') ? 'left' : 'right';
+                regType = 'headphone';
+            } else if (controlId.startsWith('mic')) {
+                apiEndpoint = '/api/set_mic_gain';
+                channel = controlId.includes('Front') ? 'front' : 'headset';
+                regType = 'microphone';
+            } else {
+                showStatus('Unknown control', true);
+                return;
+            }
+            
+            try {
+                // Send register value to backend
+                const response = await fetch(`${API_BASE}${apiEndpoint}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        channel: channel,
+                        reg_value: regValue
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Update slider and percentage display with returned value
+                    const slider = document.getElementById(controlId);
+                    const valueDisplay = document.getElementById(controlId + 'Val');
+                    if (slider && valueDisplay && result.value !== undefined) {
+                        slider.value = result.value;
+                        valueDisplay.textContent = result.value;
+                    }
+                    showStatus(`${regType} register updated`, false);
+                } else {
+                    showStatus(`Error: ${result.error}`, true);
+                }
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, true);
+            }
+        }
+
+        function updateSlider(sliderId, valueId, value) {
+            const slider = document.getElementById(sliderId);
+            const valueDisplay = document.getElementById(valueId);
+            if (!slider.isDragging) {
+                slider.value = value;
+                valueDisplay.textContent = value;
+            }
+        }
+
+        function showStatus(message, isError = false) {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.textContent = message;
+            statusDiv.className = `status-message ${isError ? 'error' : 'success'}`;
+            setTimeout(() => {
+                statusDiv.textContent = '';
+                statusDiv.className = '';
+            }, 3000);
+        }
+
+        function setupSlider(sliderId, valueId, apiEndpoint, channelOrType) {
+            const slider = document.getElementById(sliderId);
+            const valueDisplay = document.getElementById(valueId);
+
+            slider.isDragging = false;
+
+            slider.addEventListener('mousedown', () => slider.isDragging = true);
+            slider.addEventListener('touchstart', () => slider.isDragging = true);
+            
+            slider.addEventListener('input', () => {
+                valueDisplay.textContent = slider.value;
+            });
+
+            slider.addEventListener('change', async () => {
+                slider.isDragging = false;
+                try {
+                    const response = await fetch(`${API_BASE}${apiEndpoint}`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            channel: channelOrType,
+                            value: parseInt(slider.value)
+                        })
+                    });
+                    const result = await response.json();
+                    showStatus(result.success ? 'Updated successfully' : `Error: ${result.error}`, !result.success);
+                } catch (error) {
+                    showStatus(`Error: ${error.message}`, true);
+                }
+            });
+
+            document.addEventListener('mouseup', () => slider.isDragging = false);
+            document.addEventListener('touchend', () => slider.isDragging = false);
+        }
+
+        document.getElementById('pathSpeaker').addEventListener('change', async function() {
+            if (this.checked) {
+                try {
+                    const response = await fetch(`${API_BASE}/api/set_audio_path`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({path: 'Speakers'})
+                    });
+                    const result = await response.json();
+                    showStatus(result.success ? 'Switched to Speakers' : `Error: ${result.error}`, !result.success);
+                } catch (error) {
+                    showStatus(`Error: ${error.message}`, true);
+                }
+            }
+        });
+
+        document.getElementById('pathHeadphone').addEventListener('change', async function() {
+            if (this.checked) {
+                try {
+                    const response = await fetch(`${API_BASE}/api/set_audio_path`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({path: 'Headphones'})
+                    });
+                    const result = await response.json();
+                    showStatus(result.success ? 'Switched to Headphones' : `Error: ${result.error}`, !result.success);
+                } catch (error) {
+                    showStatus(`Error: ${error.message}`, true);
+                }
+            }
+        });
+
+        const micFrontCheck = document.getElementById('micSourceFront');
+        const micHeadsetCheck = document.getElementById('micSourceHeadset');
+
+        async function updateMicSource() {
+            const front = micFrontCheck.checked;
+            const headset = micHeadsetCheck.checked;
+            
+            let source;
+            if (front && headset) source = 'Both';
+            else if (front) source = 'Front';
+            else if (headset) source = 'Headset';
+            else source = 'None';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/set_mic_source`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({source: source})
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showStatus(`Mic source: ${source}`, false);
+                } else {
+                    showStatus(`Error: ${result.error}`, true);
+                }
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, true);
+            }
+        }
+
+        micFrontCheck.addEventListener('change', updateMicSource);
+        micHeadsetCheck.addEventListener('change', updateMicSource);
+
+
+
+        async function refreshSysfsAttrs() {
+            try {
+                const response = await fetch(`${API_BASE}/api/registers/list`);
+                const result = await response.json();
+                if (result.success) {
+                    const select = document.getElementById('sysfsAttr');
+                    const current = select.value;
+                    select.innerHTML = '';
+                    result.attributes.forEach(attr => {
+                        const option = document.createElement('option');
+                        option.value = attr;
+                        option.textContent = attr;
+                        select.appendChild(option);
+                    });
+                    if (result.attributes.includes(current)) {
+                        select.value = current;
+                    }
+                    showStatus('Attributes refreshed', false);
+                }
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, true);
+            }
+        }
+
+        async function readSysfsAttr() {
+            const attr = document.getElementById('sysfsAttr').value;
+            try {
+                const response = await fetch(`${API_BASE}/api/registers/read`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({attribute: attr})
+                });
+                const result = await response.json();
+                if (result.success) {
+                    document.getElementById('sysfsValue').value = result.value;
+                    document.getElementById('debugResult').textContent = `${attr}: ${result.value}`;
+                } else {
+                    document.getElementById('debugResult').textContent = `Error: ${result.error}`;
+                }
+            } catch (error) {
+                document.getElementById('debugResult').textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function writeSysfsAttr() {
+            const attr = document.getElementById('sysfsAttr').value;
+            const value = document.getElementById('sysfsValue').value;
+            if (!value) {
+                showStatus('Enter a value to write', true);
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/registers/write`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({attribute: attr, value: value})
+                });
+                const result = await response.json();
+                if (result.success) {
+                    document.getElementById('debugResult').textContent = `✓ ${attr} = ${value}`;
+                    showStatus('Write successful', false);
+                } else {
+                    document.getElementById('debugResult').textContent = `Error: ${result.error}`;
+                }
+            } catch (error) {
+                document.getElementById('debugResult').textContent = `Error: ${error.message}`;
+            }
+        }
+
+        // SYSFS Data Visualization Functions
+        async function loadFpgaDump() {
+            const vizResult = document.getElementById('vizResult');
+            vizResult.textContent = 'Loading FPGA registers...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/registers/read`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({attribute: 'poll_all'})
+                });
+                const result = await response.json();
+                if (result.success) {
+                    vizResult.textContent = result.value || 'No data available';
+                } else {
+                    vizResult.textContent = `Error: ${result.error || 'Failed to load FPGA dump'}`;
+                }
+            } catch (error) {
+                vizResult.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function loadPcm1748Dump() {
+            const vizResult = document.getElementById('vizResult');
+            vizResult.textContent = 'Loading PCM1748 registers...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/registers/read`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({attribute: 'pcm1748_dump'})
+                });
+                const result = await response.json();
+                if (result.success) {
+                    vizResult.textContent = result.value || 'No data available';
+                } else {
+                    vizResult.textContent = `Error: ${result.error || 'Failed to load PCM1748 dump'}`;
+                }
+            } catch (error) {
+                vizResult.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function loadSystemStatus() {
+            const vizResult = document.getElementById('vizResult');
+            vizResult.textContent = 'Loading system status...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/registers/read`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({attribute: 'dump_all'})
+                });
+                const result = await response.json();
+                if (result.success) {
+                    vizResult.textContent = result.value || 'No data available';
+                } else {
+                    vizResult.textContent = `Error: ${result.error || 'Failed to load system status'}`;
+                }
+            } catch (error) {
+                vizResult.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function loadAllRegisters() {
+            const vizResult = document.getElementById('vizResult');
+            vizResult.textContent = 'Loading all registers...\n\n';
+            
+            const attributes = [
+                'fpga_fw_version', 'fpga_status', 'fpga_int_status', 'fpga_sysctrl',
+                'fpga_hp_threshold', 'rotary_position', 'headphones_connected',
+                'irq_count', 'pcm1748_left_volume', 'pcm1748_right_volume'
+            ];
+            
+            let output = '';
+            for (const attr of attributes) {
+                try {
+                    const response = await fetch(`${API_BASE}/api/registers/read`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({attribute: attr})
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        output += `${attr.padEnd(25)} = ${result.value}\n`;
+                    } else {
+                        output += `${attr.padEnd(25)} = [Error: ${result.error}]\n`;
+                    }
+                } catch (error) {
+                    output += `${attr.padEnd(25)} = [Error: ${error.message}]\n`;
+                }
+                vizResult.textContent = output;
+            }
+        }
+
+
+
+
+        // File Management Section ======================================================
+
+        async function loadAudioFiles() {
+            try {
+                const response = await fetch(`${API_BASE}/api/list_audio_files`);
+                const result = await response.json();
+                const playSelect = document.getElementById('playFileSelect');
+                const downloadSelect = document.getElementById('downloadFileSelect');
+                const currentPlayValue = playSelect.value;
+                const currentDownloadValue = downloadSelect.value;
+                
+                if (result.success && result.files.length > 0) {
+                    const options = result.files.map(f => 
+                        `<option value="${f}">${f}</option>`
+                    ).join('');
+                    
+                    playSelect.innerHTML = options;
+                    downloadSelect.innerHTML = options;
+                    
+                    if (currentPlayValue && result.files.includes(currentPlayValue)) {
+                        playSelect.value = currentPlayValue;
+                    }
+                    if (currentDownloadValue && result.files.includes(currentDownloadValue)) {
+                        downloadSelect.value = currentDownloadValue;
+                    }
+                } else {
+                    playSelect.innerHTML = '<option value="">No files found</option>';
+                    downloadSelect.innerHTML = '<option value="">No files found</option>';
+                }
+            } catch (error) {
+                document.getElementById('playFileSelect').innerHTML = '<option value="">Error loading files</option>';
+                document.getElementById('downloadFileSelect').innerHTML = '<option value="">Error loading files</option>';
+            }
+        }
+
+
+        async function deleteSelectedFile() {
+            const filename = document.getElementById('downloadFileSelect').value;
+            if (!filename) {
+                showStatus('Please select a file to delete', true);
+                return;
+            }
+            
+            if (!confirm(`Delete file: ${filename}?`)) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/delete_audio_file`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({filename: filename})
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showStatus(result.message, false);
+                    loadAudioFiles();
+                } else {
+                    showStatus(`Error: ${result.error}`, true);
+                }
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, true);
+            }
+        }
+
+        // setInterval(loadAudioFiles, 5000);
+
+
+
+        // Download button
+        document.getElementById('btnDownload').addEventListener('click', async () => {
+            const filename = document.getElementById('downloadFileSelect').value;
+            
+            if (!filename) {
+                showStatus('Please select a file to download', true);
+                return;
+            }
+            
+            const status = document.getElementById('downloadStatus');
+            status.textContent = `Downloading: ${filename}`;
+            status.style.color = '#2563eb';
+            
+            window.location.href = `${API_BASE}/api/download_audio_file?filename=${encodeURIComponent(filename)}`;
+            
+            setTimeout(() => {
+                status.textContent = 'Select a file to download';
+                status.style.color = '#718096';
+            }, 2000);
+        });
+
+        // Upload functionality with drag and drop
+        const dropZone = document.getElementById('dropZone');
+        const fileUpload = document.getElementById('fileUpload');
+        const uploadStatus = document.getElementById('uploadStatus');
+
+        dropZone.addEventListener('click', () => fileUpload.click());
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('drag-over');
+        });
+
+        dropZone.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                await handleFileUpload(files[0]);
+            }
+        });
+
+        fileUpload.addEventListener('change', async (e) => {
+            if (e.target.files.length > 0) {
+                await handleFileUpload(e.target.files[0]);
+            }
+        });
+
+        async function handleFileUpload(file) {
+            if (!file.name.toLowerCase().endsWith('.wav')) {
+                showStatus('Please select a WAV file', true);
+                fileUpload.value = '';
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                uploadStatus.textContent = 'Uploading...';
+                uploadStatus.style.color = '#475569';
+                
+                const response = await fetch(`${API_BASE}/api/upload_audio_file`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    showStatus(`File uploaded: ${result.filename}`, false);
+                    uploadStatus.textContent = 'Upload complete';
+                    uploadStatus.style.color = '#059669';
+                    loadAudioFiles();
+
+                    setTimeout(() => {
+                        uploadStatus.textContent = 'Ready to upload';
+                        uploadStatus.style.color = '#718096';
+                    }, 3000);
+                } else {
+                    showStatus(`Upload error: ${result.error}`, true);
+                    uploadStatus.textContent = 'Upload failed';
+                    uploadStatus.style.color = '#dc2626';
+                }
+            } catch (error) {
+                showStatus(`Upload error: ${error.message}`, true);
+                uploadStatus.textContent = 'Upload failed';
+                uploadStatus.style.color = '#dc2626';
+            }
+        }
+
+        // Connector Test Function
+        async function runConnectorTest() {
+            const btn = document.getElementById('btnConnectorTest');
+            const resultDiv = document.getElementById('connectorTestResult');
+            const statusDiv = document.getElementById('connectorTestStatus');
+            
+            // Warn user
+            if (!confirm('This test will temporarily stop the audio driver.\n\nThe interface may freeze for 10-15 seconds.\n\nContinue?')) {
+                return;
+            }
+            
+            btn.disabled = true;
+            btn.textContent = 'Running Tests...';
+            statusDiv.textContent = 'Running...';
+            statusDiv.style.background = '#fbbf24';
+            statusDiv.style.color = 'white';
+            resultDiv.textContent = 'Running connector tests...\n\nPlease wait, driver is being restarted...\n\n';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/connector_test`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Update status badge with detailed counts
+                    const passCount = result.tests.filter(t => t.status === 'PASS').length;
+                    const skipCount = result.tests.filter(t => t.status === 'SKIP').length;
+                    const failCount = result.tests.filter(t => t.status === 'FAIL').length;
+                    
+                    let statusText = `${passCount}/${result.tests.length} PASS`;
+                    if (skipCount > 0) statusText += `; ${skipCount} SKIP`;
+                    if (failCount > 0) statusText += `; ${failCount} FAIL`;
+                    
+                    statusDiv.textContent = statusText;
+                    if (result.overall === 'PASS') {
+                        statusDiv.style.background = '#10b981';
+                        statusDiv.style.color = 'white';
+                    } else {
+                        statusDiv.style.background = '#dc2626';
+                        statusDiv.style.color = 'white';
+                    }
+                    
+                    let output = '========================================\n';
+                    output += `  CONNECTOR TEST RESULTS: ${result.overall}\n`;
+                    output += '========================================\n\n';
+                    
+                    result.tests.forEach((test, idx) => {
+                        const icon = test.status === 'PASS' ? '[PASS]' : 
+                                     test.status === 'SKIP' ? '[SKIP]' :
+                                     test.status === 'FAIL' ? '[FAIL]' : '[?]';
+                        
+                        output += `${idx + 1}. ${test.name}\n`;
+                        output += `   Status: ${icon}\n`;
+                        if (test.detail) {
+                            output += `   Detail: ${test.detail}\n`;
+                        }
+                        output += '\n';
+                    });
+                    
+                    output += '----------------------------------------\n';
+                    output += `Tests Passed: ${passCount}/${result.tests.length}\n`;
+                    
+                    // Add full output details if available
+                    if (result.full_output) {
+                        output += '\n------ Full Test Output ------\n';
+                        output += result.full_output;
+                    }
+                    
+                    resultDiv.textContent = output;
+                    showStatus(`Connector test ${result.overall}`, result.overall === 'FAIL');
+                    
+                    // Restart regular updates after test
+                    setTimeout(() => {
+                        updateStatus();
+                        updateRotaryEncoders();
+                    }, 1000);
+                } else {
+                    statusDiv.textContent = 'ERROR';
+                    statusDiv.style.background = '#dc2626';
+                    statusDiv.style.color = 'white';
+                    resultDiv.textContent = `ERROR: ${result.error}`;
+                    showStatus('Connector test failed', true);
+                }
+            } catch (error) {
+                statusDiv.textContent = 'ERROR';
+                statusDiv.style.background = '#dc2626';
+                statusDiv.style.color = 'white';
+                resultDiv.textContent = `ERROR: ${error.message}`;
+                showStatus('Connector test error', true);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Run Connectors Test';
+            }
+        }
+
+	// Backup the whole test folder. TODO: add remove folder for Test clening up
+        async function backupTestif() {
+            if (!confirm('Create backup of testif directory?\nThis will create a timestamped ZIP file.')) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/backup_testif`, {method: 'POST'});
+                const result = await response.json();
+                if (result.success) {
+                    if (confirm(result.message + '\n\nDownload now?')) {
+                        window.location.href = `${API_BASE}/api/download_backup?filename=${result.filename}`;
+                    }
+                } else {
+                    showStatus(`Error: ${result.error}`, true);
+                }
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, true);
+            }
+        }
+
+        // Record button
+        let isRecording = false;
+        document.getElementById('btnRecord').addEventListener('click', async () => {
+            const btn = document.getElementById('btnRecord');
+            const status = document.getElementById('recordStatus');
+            const filename = document.getElementById('recordFilename').value;
+
+            if (!isRecording) {
+                try {
+                    const response = await fetch(`${API_BASE}/api/record_audio`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({filename: filename, action: 'start'})
+                    });
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        isRecording = true;
+                        btn.textContent = 'Stop Recording';
+                        btn.style.background = '#991b1b';
+                        status.textContent = `Recording: ${filename}`;
+                        status.style.color = '#dc2626';
+                        showStatus('Recording started', false);
+                    } else {
+                        showStatus(`Error: ${result.error}`, true);
+                    }
+                } catch (error) {
+                    showStatus(`Error: ${error.message}`, true);
+                }
+            } else {
+                try {
+                    const response = await fetch(`${API_BASE}/api/record_audio`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({action: 'stop'})
+                    });
+                    const result = await response.json();
+                    
+                    isRecording = false;
+                    btn.textContent = 'Start Recording';
+                    btn.style.background = '#dc2626';
+                    status.textContent = 'Ready to record';
+                    status.style.color = '#718096';
+                    showStatus('Recording stopped', false);
+                    loadAudioFiles();
+                } catch (error) {
+                    showStatus(`Error: ${error.message}`, true);
+                }
+            }
+        });
+
+        // Play button
+        let isPlaying = false;
+        let playbackCheckInterval = null;
+        
+        document.getElementById('btnPlay').addEventListener('click', async () => {
+            const btn = document.getElementById('btnPlay');
+            const status = document.getElementById('playStatus');
+            const filename = document.getElementById('playFileSelect').value;
+
+            if (!filename) {
+                showStatus('Please select a file', true);
+                return;
+            }
+
+            if (!isPlaying) {
+                try {
+                    const response = await fetch(`${API_BASE}/api/play_audio_file`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({filename: filename, action: 'start'})
+                    });
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        isPlaying = true;
+                        btn.textContent = 'Stop';
+                        btn.style.background = '#991b1b';
+                        status.textContent = `Playing: ${filename}`;
+                        status.style.color = '#475569';
+                        showStatus('Playback started', false);
+                        
+                        playbackCheckInterval = setInterval(async () => {
+                            const statusResp = await fetch(`${API_BASE}/api/playback_status`);
+                            const statusData = await statusResp.json();
+                            if (!statusData.is_playing) {
+                                isPlaying = false;
+                                btn.textContent = 'Play';
+                                btn.style.background = '#475569';
+                                status.textContent = 'Select a file to play';
+                                status.style.color = '#718096';
+                                clearInterval(playbackCheckInterval);
+                            }
+                        }, 500);
+                    } else {
+                        showStatus(`Error: ${result.error}`, true);
+                    }
+                } catch (error) {
+                    showStatus(`Error: ${error.message}`, true);
+                }
+            } else {
+                try {
+                    const response = await fetch(`${API_BASE}/api/play_audio_file`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({action: 'stop'})
+                    });
+                    
+                    isPlaying = false;
+                    btn.textContent = 'Play';
+                    btn.style.background = '#475569';
+                    status.textContent = 'Select a file to play';
+                    status.style.color = '#718096';
+                    if (playbackCheckInterval) clearInterval(playbackCheckInterval);
+                    showStatus('Playback stopped', false);
+                } catch (error) {
+                    showStatus(`Error: ${error.message}`, true);
+                }
+            }
+        });
+
+        // Audio Loop Test button
+        let isLoopTesting = false;
+        
+        document.getElementById('btnLoopTest').addEventListener('click', async () => {
+            const btn = document.getElementById('btnLoopTest');
+            const status = document.getElementById('loopTestStatus');
+
+            if (!isLoopTesting) {
+                try {
+                    const response = await fetch(`${API_BASE}/api/loop_test`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({action: 'start'})
+                    });
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        isLoopTesting = true;
+                        btn.textContent = 'Stop Loop Test';
+                        btn.style.background = '#dc2626';
+                        status.textContent = 'Loop test running...';
+                        status.style.color = '#dc2626';
+                        showStatus('Loop test started', false);
+                    } else {
+                        showStatus(`Error: ${result.error}`, true);
+                    }
+                } catch (error) {
+                    showStatus(`Error: ${error.message}`, true);
+                }
+            } else {
+                try {
+                    const response = await fetch(`${API_BASE}/api/loop_test`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({action: 'stop'})
+                    });
+                    const result = await response.json();
+                    
+                    isLoopTesting = false;
+                    btn.textContent = 'Start Loop Test';
+                    btn.style.background = '#475569';
+                    status.textContent = 'Ready';
+                    status.style.color = '#718096';
+                    showStatus('Loop test stopped', false);
+                } catch (error) {
+                    showStatus(`Error: ${error.message}`, true);
+                }
+            }
+        });
+
+        // Initialize page - load data sequentially to avoid overwhelming server
+        async function initializePage() {
+            const overlay = document.getElementById('loadingOverlay');
+            const loadingBar = document.getElementById('loadingBar');
+            const loadingStatus = document.getElementById('loadingStatus');
+            
+            function updateProgress(percent, status) {
+                loadingBar.style.width = percent + '%';
+                loadingStatus.textContent = status;
+            }
+            
+            updateProgress(0, 'Waiting for server...');
+            console.log('Waiting for server to be ready...');
+            // Give server time to fully start up (GUI initialization, etc.)
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            updateProgress(20, 'Loading version info...');
+            console.log('Starting initialization...');
+            try {
+                await loadVersionInfo();
+                await new Promise(resolve => setTimeout(resolve, 200));
+                
+                updateProgress(40, 'Loading audio status...');
+                await updateStatus();
+                await new Promise(resolve => setTimeout(resolve, 200));
+                
+                updateProgress(60, 'Loading rotary encoders...');
+                await updateRotaryEncoders();
+                await new Promise(resolve => setTimeout(resolve, 200));
+                
+                updateProgress(75, 'Loading headset status...');
+                await updateHeadsetStatus();
+                await new Promise(resolve => setTimeout(resolve, 200));
+                
+                updateProgress(85, 'Loading hardware registers...');
+                await updateHardwareRegisters();
+                await new Promise(resolve => setTimeout(resolve, 200));
+                
+                updateProgress(95, 'Loading audio files...');
+                loadAudioFiles();
+                await new Promise(resolve => setTimeout(resolve, 200));
+                
+                updateProgress(100, 'Starting update intervals...');
+                // Start update intervals only after initial load completes
+                updateInterval = setInterval(updateStatus, 500);
+                rotaryInterval = setInterval(updateRotaryEncoders, 200);
+                setInterval(updateHeadsetStatus, 1000);
+                setInterval(updateHardwareRegisters, 2000);
+                
+                console.log('Initialization complete!');
+                
+                // Hide loading overlay
+                overlay.style.opacity = '0';
+                overlay.style.transition = 'opacity 0.5s ease';
+                setTimeout(() => {
+                    overlay.style.display = 'none';
+                }, 500);
+                
+            } catch (error) {
+                console.error('Initialization error:', error);
+                updateProgress(100, 'Error - attempting to continue...');
+                // Try to start intervals anyway
+                updateInterval = setInterval(updateStatus, 500);
+                rotaryInterval = setInterval(updateRotaryEncoders, 200);
+                
+                // Still hide overlay
+                setTimeout(() => {
+                    overlay.style.display = 'none';
+                }, 1000);
+            }
+        }
+        
+        initializePage();
+
+        setupSlider('speakerLeft', 'speakerLeftVal', '/api/set_volume', 'left');
+        setupSlider('speakerRight', 'speakerRightVal', '/api/set_volume', 'right');
+        setupSlider('hpLeft', 'hpLeftVal', '/api/set_headphone_volume', 'left');
+        setupSlider('hpRight', 'hpRightVal', '/api/set_headphone_volume', 'right');
+        setupSlider('micFront', 'micFrontVal', '/api/set_microphone_gain', 'left');
+        setupSlider('micHeadset', 'micHeadsetVal', '/api/set_microphone_gain', 'right');
+
+
+       // Setup headphone detection threshold slider
+        function setupThresholdSlider() {
+            const slider = document.getElementById('hpThreshold');
+            const valueDisplay = document.getElementById('hpThresholdVal');
+            const regInput = document.getElementById('hpThresholdReg');
+            
+            if (!slider || !regInput) return;
+            
+            slider.isDragging = false;
+            slider.addEventListener('mousedown', () => slider.isDragging = true);
+            slider.addEventListener('touchstart', () => slider.isDragging = true);
+            
+            slider.addEventListener('input', () => {
+                const value = parseInt(slider.value);
+                if (valueDisplay) valueDisplay.textContent = value;
+                regInput.value = '0x' + value.toString(16).toUpperCase().padStart(2, '0');
+            });
+            
+            slider.addEventListener('change', async () => {
+                slider.isDragging = false;
+                const value = parseInt(slider.value);
+                
+                try {
+                    const response = await fetch(`${API_BASE}/api/registers/write`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            attribute: 'fpga_hp_threshold',
+                            value: value.toString()
+                        })
+                    });
+                    const result = await response.json();
+                    if (!result.success) {
+                        showStatus(`Error: ${result.error}`, true);
+                    }
+                } catch (error) {
+                    showStatus(`Error: ${error.message}`, true);
+                }
+            });
+            
+            document.addEventListener('mouseup', () => slider.isDragging = false);
+            document.addEventListener('touchend', () => slider.isDragging = false);
+        }
+        
+        setupThresholdSlider();
+        updateDetectionThreshold();
+        setInterval(updateDetectionThreshold, 5000);
+
+
+        function setupLED(ledNum) {
+            ['R', 'G', 'B'].forEach(color => {
+                const slider = document.getElementById(`led${ledNum}${color}`);
+                const valSpan = document.getElementById(`led${ledNum}${color}Val`);
+                
+                slider.isDragging = false;
+                slider.addEventListener('mousedown', () => slider.isDragging = true);
+                slider.addEventListener('touchstart', () => slider.isDragging = true);
+                
+                slider.addEventListener('input', () => {
+                    valSpan.textContent = slider.value;
+                    const r = document.getElementById(`led${ledNum}R`).value;
+                    const g = document.getElementById(`led${ledNum}G`).value;
+                    const b = document.getElementById(`led${ledNum}B`).value;
+                    const preview = document.getElementById(`led${ledNum}Preview`);
+                    preview.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+                });
+
+                slider.addEventListener('change', async () => {
+                    slider.isDragging = false;
+                    const r = document.getElementById(`led${ledNum}R`).value;
+                    const g = document.getElementById(`led${ledNum}G`).value;
+                    const b = document.getElementById(`led${ledNum}B`).value;
+                    
+                    try {
+                        const response = await fetch(`${API_BASE}/api/set_rgb_led`, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                led: ledNum,
+                                r: parseInt(r),
+                                g: parseInt(g),
+                                b: parseInt(b)
+                            })
+                        });
+                        const result = await response.json();
+                        if (!result.success) {
+                            showStatus(`LED Error: ${result.error}`, true);
+                        }
+                    } catch (error) {
+                        showStatus(`LED Error: ${error.message}`, true);
+                    }
+                });
+
+                document.addEventListener('mouseup', () => slider.isDragging = false);
+                document.addEventListener('touchend', () => slider.isDragging = false);
+            });
+        }
+
+        setupLED(1);
+        setupLED(2);
+        
+        
+        // ============================================================================
+        // Handle autostarts
+        // ============================================================================
+        
+        // Load both statuses on page load
+        async function loadSystemSettings() {
+            try {
+                // Load autostart
+                const autostartResp = await fetch(`${API_BASE}/api/autostart/status`);
+                const autostartResult = await autostartResp.json();
+                if (autostartResult.success) {
+                    document.getElementById('autostartCheckbox').checked = autostartResult.enabled;
+                }
+                
+                // Load wavip
+                const wavipResp = await fetch(`${API_BASE}/api/wavip/status`);
+                const wavipResult = await wavipResp.json();
+                if (wavipResult.success) {
+                    document.getElementById('wavipCheckbox').checked = wavipResult.enabled;
+                }
+            } catch (error) {
+                console.error('Error loading system settings:', error);
+            }
+        }
+
+        // Autostart checkbox handler
+        document.getElementById('autostartCheckbox').addEventListener('change', async (e) => {
+            try {
+                const response = await fetch(`${API_BASE}/api/autostart/set`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({enabled: e.target.checked})
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showStatus(`Autostart ${result.enabled ? 'enabled' : 'disabled'}`, false);
+                } else {
+                    showStatus(`Error: ${result.error}`, true);
+                    e.target.checked = !e.target.checked;
+                }
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, true);
+                e.target.checked = !e.target.checked;
+            }
+        });
+
+        // Wavip checkbox handler
+        document.getElementById('wavipCheckbox').addEventListener('change', async (e) => {
+            try {
+                const response = await fetch(`${API_BASE}/api/wavip/set`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({enabled: e.target.checked})
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showStatus(`IP address playback ${result.enabled ? 'enabled' : 'disabled'}`, false);
+                } else {
+                    showStatus(`Error: ${result.error}`, true);
+                    e.target.checked = !e.target.checked;
+                }
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, true);
+                e.target.checked = !e.target.checked;
+            }
+        });
+
+        // Call on page load
+        loadSystemSettings();
+
+
+        // ============================================================================
+        // Physical Display and Button Event Functions
+        // ============================================================================
+
+        const canvas = document.getElementById('displayCanvas');
+        const ctx = canvas.getContext('2d');
+        let buttonCoordinates = {};
+        let currentButtonStates = {};  // Track which buttons are currently pressed
+
+        // Session detection - auto-reload on backend restart
+        let currentSessionId = null;
+
+        async function checkSession() {
+            try {
+                const response = await fetch(`${API_BASE}/api/session_id`, {timeout: 1000});
+                const data = await response.json();
+                
+                if (data.success && data.session_id) {
+                    if (currentSessionId === null) {
+                        // First time - store session ID
+                        currentSessionId = data.session_id;
+                        console.log('Session initialized:', currentSessionId);
+                    } else if (currentSessionId !== data.session_id) {
+                        // Session changed - backend restarted
+                        console.log('Backend restarted - new session detected');
+                        currentSessionId = data.session_id;
+                        
+                        // Clear log
+                        displayedEvents = [];
+                        addedEventKeys.clear();
+                        updateEventLog([]);
+                        
+                        // Reload page to get fresh state
+                        location.reload();
+                    }
+                    // else: same session ID - do nothing, keep the log
+                }
+            } catch (error) {
+                // Ignore - API may not be ready
+            }
+        }
+
+        // Start checking after page loads
+        setTimeout(() => setInterval(checkSession, 2000), 2000);
+
+        
+        function openFullView() {
+            // Open in a popup window
+            const width = 1200;
+            const height = 800;
+            const left = (screen.width - width) / 2;
+            const top = (screen.height - height) / 2;
+            
+            const features = `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`;
+            
+            // Open display_monitor.html in new window
+            const fullViewWindow = window.open('display_monitor.html', 'GuiMonitorFullView', features);
+            
+            if (fullViewWindow) {
+                fullViewWindow.focus();
+            } else {
+                alert('Please allow pop-ups for this site to use Full View mode');
+            }
+        }
+
+        async function loadButtonCoordinates() {
+            try {
+                const response = await fetch(`${API_BASE}/api/button_coordinates`);
+                const data = await response.json();
+                if (data.success) {
+                    buttonCoordinates = data.buttons;
+                    console.log('Loaded button coordinates:', Object.keys(buttonCoordinates).length);
+                    drawDisplay();
+                }
+            } catch (error) {
+                console.error('Error loading button coordinates:', error);
+            }
+        }
+
+        function drawDisplay() {
+            // Clear canvas
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw dividing line between left and right displays
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(1424, 0);
+            ctx.lineTo(1424, 280);
+            ctx.stroke();
+            
+            // Draw labels
+            // ctx.fillStyle = '#94a3b8';
+            // ctx.font = '14px Arial';
+            // ctx.fillText('LEFT DISPLAY (-270°)', 600, 20);
+            // ctx.fillText('RIGHT DISPLAY', 1900, 20);
+            
+            // Draw all buttons
+            for (const [buttonId, coords] of Object.entries(buttonCoordinates)) {
+                const isPressed = currentButtonStates[buttonId] || false;
+                const [width, height] = getButtonSize(buttonId);
+                
+                ctx.fillStyle = isPressed ? '#fbbf24' : '#3b82f6';
+                ctx.fillRect(coords.physical.x, coords.physical.y, width, height);
+                
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(coords.physical.x, coords.physical.y, width, height);
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(buttonId.toUpperCase(), coords.physical.x + width/2, coords.physical.y + height/2);
+            }
+                    }
+
+        const LARGE_BUTTONS = ['l1', 'l2', 'l3', 'r1', 'r2', 'r3'];
+
+        function getButtonSize(btnId) {            
+            return LARGE_BUTTONS.includes(btnId) ? [130, 70] : [50, 50];
+        }
+
+        function drawButton(ctx, btnId, ui_x, ui_y, pressed, physical = true) {
+            const [width, height] = getButtonSize(btnId);
+            let draw_x, draw_y;
+            
+            if (physical) {
+                // Transform to physical coordinates
+                if (ui_y < 280) {
+                    // LEFT display (rotated)
+                    draw_x = 1424 - ui_x - width;
+                    draw_y = 280 - ui_y - height;
+                } else {
+                    // RIGHT display (normal)
+                    draw_x = ui_x + 1424;
+                    draw_y = ui_y - 280;
+                }
+            } else {
+                // UI coordinates - use as-is (top-left)
+                draw_x = ui_x;
+                draw_y = ui_y;
+            }
+            
+            // Draw button
+            ctx.fillStyle = pressed ? '#fbbf24' : '#3b82f6';
+            ctx.fillRect(draw_x, draw_y, width, height);
+            
+            // Draw border
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(draw_x, draw_y, width, height);
+            
+            // Draw label (centered)
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 12px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(btnId.toUpperCase(), draw_x + width/2, draw_y + height/2);
+        }
+
+        function updateButtonState(buttonId, isPressed) {
+            currentButtonStates[buttonId] = isPressed;
+            drawDisplay();
+        }
+
+        function updateEventLog(events) {
+            const logDiv = document.getElementById('eventLog');
+            if (!events || events.length === 0) {
+                logDiv.innerHTML = '<div style="color: #94a3b8; font-style: italic;">Waiting for button events...</div>';
+                return;
+            }
+            
+            let html = '';
+            // Show events (already newest first)
+           events.forEach(evt => {
+                const eventStyles = {
+                    'press':   { color: '#10b981', icon: '▼', text: 'PRESS  ' },
+                    'release': { color: '#ef4444', icon: '▲', text: 'RELEASE' }
+                };
+                
+                const style = eventStyles[evt.event_type] || { color: '#94a3b8', icon: '?', text: 'UNKNOWN' };
+                
+                html += `<div style="padding: 4px 0; border-bottom: 1px solid #334155;">`;
+                html += `<span style="color: #64748b;">${evt.timestamp}</span> `;
+                html += `<span style="color: ${style.color}; font-weight: bold;">${style.icon} ${style.text}</span> `;
+                html += `<span style="color: #e2e8f0; font-weight: bold;">${evt.button_id.toUpperCase()}</span> `;
+                html += `<span style="color: #94a3b8;">sys:(${Math.round(evt.system_x || 0)},${Math.round(evt.system_y || 0)}) `;
+                html += `phys:(${evt.physical_x},${evt.physical_y})</span>`;
+                html += `</div>`;
+            });
+            
+            logDiv.innerHTML = html;
+            logDiv.scrollTop = 0;
+        }
+
+        let addedEventKeys = new Set();
+        let displayedEvents = [];  // Track events we've shown in the log
+
+        async function pollButtonStates() {
+            try {
+                const response = await fetch(`${API_BASE}/api/button_states`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Update button states from authoritative register
+                    currentButtonStates = data.states;
+                    
+                    drawDisplay();
+                }
+            } catch (error) {
+                console.error('Error polling button states:', error);
+            }
+        }
+
+        async function pollButtonEvents() {
+            try {
+                const response = await fetch(`${API_BASE}/api/button_events`);
+                const data = await response.json();
+                
+                if (data.success && data.events && data.events.length > 0) {
+                    let hasNewEvents = false;
+                    
+                    data.events.forEach(evt => {
+                        const eventKey = `${evt.timestamp}_${evt.button_id}_${evt.event_type}`;
+                        
+                        if (!addedEventKeys.has(eventKey)) {
+                            addedEventKeys.add(eventKey);
+                            
+                            // Only show PRESS events, skip RELEASE
+                            // if (evt.event_type === 'press') 
+                            {
+                                hasNewEvents = true;
+                                
+                                // Add to front of displayed events array
+                                displayedEvents.unshift(evt);
+                                
+                                // Limit to 100 events
+                                if (displayedEvents.length > 100) {
+                                    displayedEvents.pop();
+                                }
+                            }
+                        }
+                    });
+                    
+                    if (hasNewEvents) {
+                        updateEventLog(displayedEvents);
+                        
+                        if (addedEventKeys.size > 1000) {
+                            addedEventKeys.clear();
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error polling button events:', error);
+            }
+        }
+
+        // Initialize
+        displayedEvents = [];        // Clear event log
+        addedEventKeys.clear();       // Clear event tracking
+        updateEventLog([]);           // Update display to show empty log
+
+        loadButtonCoordinates();
+
+        // Poll button states for display (reduced frequency)
+        setInterval(pollButtonStates, 100);    // Reduced from 50ms
+
+        // Poll events for log (reduced frequency)
+        setInterval(pollButtonEvents, 200);    // Reduced from 100ms
+
+
+        window.addEventListener('beforeunload', () => {
+                if (updateInterval) clearInterval(updateInterval);
+                if (rotaryInterval) clearInterval(rotaryInterval);
+            }
+        );
+    </script>
+</body>
+</html>

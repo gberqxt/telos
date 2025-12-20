@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GUI Monitor - Full View</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+            display: flex;
+            flex-direction: column;
+        }
+        .container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            margin: 12px;
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header {
+            color: white;
+            text-align: center;
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            flex-shrink: 0;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .header .subtitle {
+            font-size: 11px;
+            color: #cbd5e1;
+            margin-top: 2px;
+        }
+        .canvas-section {
+            padding: 12px;
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        .canvas-section h2 {
+            margin: 0 0 8px 0;
+            color: #1e293b;
+            font-size: 14px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+        .canvas-wrapper {
+            background: #f8fafc;
+            border-radius: 6px;
+            padding: 8px;
+            border: 1px solid #e2e8f0;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 0;
+        }
+        canvas {
+            display: block;
+            border: 2px solid #cbd5e1;
+            border-radius: 4px;
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+            image-rendering: crisp-edges;
+            background: #1e293b;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-top: 8px;
+            flex-shrink: 0;
+        }
+        .stat-box {
+            background: #f8fafc;
+            padding: 8px;
+            border-radius: 4px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+        }
+        .stat-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1e293b;
+        }
+        .stat-label {
+            font-size: 9px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin-top: 2px;
+            font-weight: 600;
+        }
+        .log-section {
+            padding: 12px;
+            background: white;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            height: 30vh;
+            min-height: 150px;
+            max-height: 400px;
+        }
+        .log-section h2 {
+            margin: 0 0 8px 0;
+            color: #1e293b;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .log-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 10px;
+            background: #f1f5f9;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            font-size: 10px;
+            color: #475569;
+            flex-shrink: 0;
+        }
+        .clear-log-btn {
+            background: #dc2626;
+            color: white;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .clear-log-btn:hover {
+            background: #991b1b;
+        }
+        .event-log {
+            background: #f8fafc;
+            border: 1px solid #cbd5e0;
+            border-radius: 4px;
+            padding: 8px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 11px;
+            line-height: 1.4;
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            min-height: 0;
+        }
+        .event-log::-webkit-scrollbar {
+            width: 8px;
+        }
+        .event-log::-webkit-scrollbar-track {
+            background: #e2e8f0;
+            border-radius: 4px;
+        }
+        .event-log::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 4px;
+        }
+        .event-log::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+        .event-item {
+            padding: 3px 0;
+            border-bottom: 1px solid #e2e8f0;
+            color: #1e293b;
+            white-space: nowrap;
+        }
+        .event-item:last-child {
+            border-bottom: none;
+        }
+        .event-press {
+            color: #ca8a04;
+            font-weight: 600;
+        }
+        .event-release {
+            color: #2563eb;
+            font-weight: 600;
+        }
+        .event-button {
+            color: #1e293b;
+            font-weight: 700;
+        }
+        .event-coords {
+            color: #059669;
+            font-size: 10px;
+        }
+        .event-timestamp {
+            color: #64748b;
+            font-size: 9px;
+        }
+        .no-events {
+            color: #94a3b8;
+            font-style: italic;
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>GUI Monitor - Full View</h1>
+            <div class="subtitle">Real-time button display and event log</div>
+        </div>
+
+        <div class="canvas-section">
+            <h2>Physical Display Representation</h2>
+            <div class="canvas-wrapper">
+                <canvas id="displayCanvas" width="2848" height="280"></canvas>
+            </div>
+            <div class="stats">
+                <div class="stat-box">
+                    <div class="stat-value" id="buttonCount">0</div>
+                    <div class="stat-label">Buttons Loaded</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="eventCount">0</div>
+                    <div class="stat-label">Total Events</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="activeButtons">0</div>
+                    <div class="stat-label">Active Presses</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="log-section">
+            <h2>Button Event Log</h2>
+            <div class="log-info">
+                <span>Showing <span id="logCount">0</span> events (max 4096)</span>
+                <button class="clear-log-btn" onclick="clearEventLog()">Clear Log</button>
+            </div>
+            <div class="event-log" id="eventLog">
+                <div class="no-events">Waiting for button events...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '';
+        const canvas = document.getElementById('displayCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        
+        let buttonCoordinates = {};
+        let currentButtonStates = {};
+        let eventCount = 0;
+        let eventLog = [];  // Store all events, limited to 4096
+        const MAX_EVENTS = 4096;
+        
+
+        const LARGE_BUTTONS = ['l1', 'l2', 'l3', 'r1', 'r2', 'r3'];
+        
+        // Session detection - auto-reload on backend restart
+        let currentSessionId = null;
+
+        async function checkSession() {
+            try {
+                const response = await fetch(`${API_BASE}/api/session_id`, {timeout: 1000});
+                const data = await response.json();
+                
+                if (data.success && data.session_id) {
+                    if (currentSessionId === null) {
+                        currentSessionId = data.session_id;
+                    } else if (currentSessionId !== data.session_id) {
+                        console.log('Backend restarted - reloading page');
+                        location.reload();
+                    }
+                }
+            } catch (error) {
+                // Ignore - API may not be ready
+            }
+        }
+
+        // Start checking after page loads
+        setTimeout(() => setInterval(checkSession, 2000), 2000);
+
+
+        function getButtonSize(btnId) {
+            return LARGE_BUTTONS.includes(btnId) ? [130, 70] : [50, 50];
+        }
+
+        async function loadButtonCoordinates() {
+            try {
+                const response = await fetch(`${API_BASE}/api/button_coordinates`);
+                const data = await response.json();
+                if (data.success) {
+                    buttonCoordinates = data.buttons;
+                    document.getElementById('buttonCount').textContent = Object.keys(buttonCoordinates).length;
+                    console.log('Loaded button coordinates:', Object.keys(buttonCoordinates).length);
+                    drawDisplay();
+                }
+            } catch (error) {
+                console.error('Error loading button coordinates:', error);
+            }
+        }
+
+        function drawDisplay() {
+            // Clear canvas
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw dividing line between left and right displays
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(1424, 0);
+            ctx.lineTo(1424, 280);
+            ctx.stroke();
+            
+            // Draw labels
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '14px Arial';
+            ctx.fillText('LEFT DISPLAY (-270Â°)', 600, 20);
+            ctx.fillText('RIGHT DISPLAY', 1900, 20);
+            
+            let seenEvents = new Set();
+            
+            // Draw all buttons
+            for (const [buttonId, coords] of Object.entries(buttonCoordinates)) {
+                const isPressed = currentButtonStates[buttonId] || false;
+                const [width, height] = getButtonSize(buttonId);
+                
+                // Draw button rectangle
+                ctx.fillStyle = isPressed ? '#fbbf24' : '#3b82f6';
+                ctx.fillRect(coords.physical.x, coords.physical.y, width, height);
+                
+                // Draw border
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(coords.physical.x, coords.physical.y, width, height);
+                
+                // Draw label (centered)
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(buttonId.toUpperCase(), coords.physical.x + width/2, coords.physical.y + height/2);
+            }
+        }
+
+        function addEventToLog(evt) {
+        
+    
+            // Add new event to the beginning of the array
+            eventLog.unshift(evt);
+            
+            // Limit to MAX_EVENTS
+            if (eventLog.length > MAX_EVENTS) {
+                eventLog = eventLog.slice(0, MAX_EVENTS);
+            }
+            
+            updateEventLogDisplay();
+        }
+
+        function updateEventLogDisplay() {
+            const logDiv = document.getElementById('eventLog');
+            const logCountSpan = document.getElementById('logCount');
+            
+            logCountSpan.textContent = eventLog.length;
+            
+            if (eventLog.length === 0) {
+                logDiv.innerHTML = '<div class="no-events">Waiting for button events...</div>';
+                return;
+            }
+            
+            let html = '';
+            
+            // Display all PRESS events (newest first)  ← CHANGED: Comment updated
+            for (let i = 0; i < eventLog.length; i++) {
+                const evt = eventLog[i];
+                
+                const eventStyles = {
+                    'press':   { color: '#10b981', icon: '▼', text: 'PRESS\t' },
+                    'release': { color: '#ef4444', icon: '▲', text: 'RELEASE\t' }
+                };
+                
+                const style = eventStyles[evt.event_type] || { color: '#94a3b8', icon: '?', text: 'UNKNOWN' };
+                
+                html += `<div style="padding: 4px 0; border-bottom: 1px solid #334155;">`;
+                html += `<span style="color: #64748b;">${evt.timestamp}</span> `;
+                html += `<span style="color: ${style.color}; font-weight: bold;">${style.icon} ${style.text}</span> `;
+                html += `<span style="color: #e2e8f0; font-weight: bold;">${evt.button_id.toUpperCase()}</span> `;
+                html += `<span style="color: #94a3b8;">sys:(${Math.round(evt.system_x || 0)},${Math.round(evt.system_y || 0)}) `;
+                html += `phys:(${evt.physical_x},${evt.physical_y})</span>`;
+                html += `</div>`;
+            }
+            
+            logDiv.innerHTML = html;
+            logDiv.scrollTop = 0;
+        }
+        
+
+
+        
+         async function clearEventLog() {
+         
+             if (eventLog.length === 0) return;           
+
+		           try {
+		               await fetch(`${API_BASE}/api/clear_button_events`, {
+		                   method: 'POST'
+		               });
+		           } catch (error) {
+		               console.error('Error clearing backend events:', error);
+		           }
+
+		           eventLog = [];
+		           eventCount = 0;
+		           addedEventKeys.clear();
+		           
+		           document.getElementById('eventCount').textContent = 0;
+		           updateEventLogDisplay();
+		           
+		           // States will be cleared on next poll from backend
+        }
+
+        let addedEventKeys = new Set();
+
+        async function pollButtonStates() {
+            try {
+                const response = await fetch(`${API_BASE}/api/button_states`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Update button states from authoritative register
+                    currentButtonStates = data.states;
+                    
+                    // Count active buttons
+                    let activeCount = Object.values(currentButtonStates).filter(state => state).length;
+                    document.getElementById('activeButtons').textContent = activeCount;
+                    
+                    drawDisplay();
+                }
+            } catch (error) {
+                console.error('Error polling button states:', error);
+            }
+        }
+
+        async function pollButtonEvents() {
+            try {
+                const response = await fetch(`${API_BASE}/api/button_events`);
+                const data = await response.json();
+                
+                if (data.success && data.events && data.events.length > 0) {
+                    let hasNewEvents = false;
+                    
+                    data.events.forEach(evt => {
+                        const eventKey = `${evt.timestamp}_${evt.button_id}_${evt.event_type}`;
+                        
+                        if (!addedEventKeys.has(eventKey)) {
+                            addedEventKeys.add(eventKey);
+                            hasNewEvents = true;
+                            eventCount++;
+                            addEventToLog(evt);
+                        }
+                    });
+                    
+                    if (hasNewEvents) {
+                        document.getElementById('eventCount').textContent = eventCount;
+                        updateEventLogDisplay();
+                        
+                        if (addedEventKeys.size > 1000) {
+                            addedEventKeys.clear();
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error polling button events:', error);
+            }
+        }
+
+        // Initialize
+        loadButtonCoordinates();
+        
+        // Poll button states for display (fast)
+        setInterval(pollButtonStates, 50);
+        
+        // Poll events for log (can be slower)
+        setInterval(pollButtonEvents, 100);
+       
+
+    </script>
+</body>
+</html>
+

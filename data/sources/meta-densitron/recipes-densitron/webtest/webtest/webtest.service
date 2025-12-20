@@ -1,0 +1,19 @@
+[Unit]
+Description=Web Test Interface (Audio/Display/Touch)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/root/webtest
+# Only create flags on FIRST boot (if .initialized doesn't exist)
+ExecStartPre=/bin/sh -c 'test -f /home/root/webtest/.initialized || (touch /home/root/webtest/.autostart && touch /home/root/webtest/.wavip_autoplay && touch /home/root/webtest/.initialized)'
+# Run wavip if flag exists
+ExecStartPre=/bin/sh -c 'test -f /home/root/webtest/.wavip_autoplay && /usr/bin/python3 /home/root/webtest/wavip.py || true'
+ExecStart=/usr/bin/python3 /home/root/webtest/app.py
+Restart=always
+RestartSec=5
+
+ConditionPathExists=/home/root/webtest/.autostart
+
+[Install]
+WantedBy=multi-user.target
