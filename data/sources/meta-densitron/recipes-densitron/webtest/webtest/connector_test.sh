@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 ################################################################################
 # Connector Test Script - CN5/CN6 Verification
 # 

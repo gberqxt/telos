@@ -19,5 +19,3 @@ RouteMetric=200
 Gateway=192.168.2.1
 Metric=200
 GatewayOnLink=yes
-
-

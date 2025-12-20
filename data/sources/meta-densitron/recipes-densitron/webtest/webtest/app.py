@@ -1958,9 +1958,13 @@ if __name__ == '__main__':
     print("Generating wavip.wav...")
     wavip.create_waveform(external_ip, "wavip.wav")
     
-    # Start wavip playback
-    print("Starting wavip playback loop...")
-    start_wavip_playback()
+    # Start wavip playback only if flag exists
+    flag_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.wavip_autoplay')
+    if os.path.exists(flag_file):
+        print("Starting wavip playback loop (autoplay enabled)...")
+        start_wavip_playback()
+    else:
+        print("Wavip autoplay disabled (flag not found)")
     
     print("=" * 70)
     print(f"Server running at:   http://0.0.0.0:5000")

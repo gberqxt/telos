@@ -2473,6 +2473,13 @@
                 loadingStatus.textContent = status;
             }
             
+            // Stop wavip playback immediately on page load
+            try {
+                await fetch(`${API_BASE}/stopwavip`);
+            } catch (e) {
+                console.log('Could not stop wavip:', e);
+            }
+            
             updateProgress(0, 'Waiting for server...');
             console.log('Waiting for server to be ready...');
             // Give server time to fully start up (GUI initialization, etc.)

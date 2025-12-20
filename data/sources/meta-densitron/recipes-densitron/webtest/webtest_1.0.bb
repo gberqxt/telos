@@ -10,7 +10,6 @@ SRC_URI = "file://app_backend.py \
            file://README.md \
            file://requirements.txt \
            file://wavip.py \
-           file://wavip.wav \
            file://templates/display_monitor.html \
            file://templates/index.html \
            file://sound/chirp_sine_100-10kHz_16bit_48000-stereo.wav \
@@ -44,7 +43,6 @@ do_install() {
     install -m 0644 ${WORKDIR}/README.md ${D}/home/root/webtest/
     install -m 0644 ${WORKDIR}/requirements.txt ${D}/home/root/webtest/
     install -m 0755 ${WORKDIR}/wavip.py ${D}/home/root/webtest/
-    install -m 0644 ${WORKDIR}/wavip.wav ${D}/home/root/webtest/
 
     # Install templates
     install -d ${D}/home/root/webtest/templates
