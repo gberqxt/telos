@@ -43,6 +43,12 @@ do_install() {
     install -m 0644 ${WORKDIR}/README.md ${D}/home/root/webtest/
     install -m 0644 ${WORKDIR}/requirements.txt ${D}/home/root/webtest/
     install -m 0755 ${WORKDIR}/wavip.py ${D}/home/root/webtest/
+    install -m 0644 ${WORKDIR}/wavip.wav ${D}/home/root/webtest/
+
+    # Create flag files with correct permissions
+    touch ${D}/home/root/webtest/.initialized
+    touch ${D}/home/root/webtest/.autostart
+    touch ${D}/home/root/webtest/.wavip_autoplay
 
     # Install templates
     install -d ${D}/home/root/webtest/templates

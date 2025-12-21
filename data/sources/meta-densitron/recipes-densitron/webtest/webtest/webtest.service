@@ -1,19 +1,21 @@
 [Unit]
 Description=Web Test Interface (Audio/Display/Touch)
-After=network.target
+After=network.target weston.service
+Wants=weston.service
+ConditionPathExists=/home/root/webtest/.autostart
 
 [Service]
 Type=simple
+Environment=DISPLAY=:0
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=XDG_RUNTIME_DIR=/run/user/0
 WorkingDirectory=/home/root/webtest
-# Only create flags on FIRST boot (if .initialized doesn't exist)
-ExecStartPre=/bin/sh -c 'test -f /home/root/webtest/.initialized || (touch /home/root/webtest/.autostart && touch /home/root/webtest/.wavip_autoplay && touch /home/root/webtest/.initialized)'
-# Run wavip if flag exists
+ExecStartPre=/bin/sleep 5
+ExecStartPre=/bin/sh -c 'test -f /home/root/webtest/.autostart || exit 1'
 ExecStartPre=/bin/sh -c 'test -f /home/root/webtest/.wavip_autoplay && /usr/bin/python3 /home/root/webtest/wavip.py || true'
 ExecStart=/usr/bin/python3 /home/root/webtest/app.py
-Restart=always
+Restart=on-failure
 RestartSec=5
-
-ConditionPathExists=/home/root/webtest/.autostart
 
 [Install]
 WantedBy=multi-user.target

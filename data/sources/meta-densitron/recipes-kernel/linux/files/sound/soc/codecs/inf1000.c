@@ -4000,4 +4000,4 @@ module_platform_driver(densitron_audio_platform_driver);
 MODULE_DESCRIPTION("Densitron INF1000 Audio ASoC Driver");
 MODULE_AUTHOR("Gian Luca Bernocchi <gianluca.bernocchi@quixant.com>");
 MODULE_LICENSE("GPL");
-MODULE_VERSION("4.13");
+MODULE_VERSION("4.14");
