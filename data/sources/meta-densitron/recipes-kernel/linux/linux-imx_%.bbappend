@@ -5,9 +5,6 @@ FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 SRC_URI += "file://0001-AAEON-patch-3.2-to-3.7.patch"
 
 
-# Add kernel configuration fragment
-SRC_URI += "file://inf1000.cfg "
-
 # Add audio codec driver files
 SRC_URI += "file://sound/soc/codecs/inf1000.c "
 
@@ -22,12 +19,19 @@ SRC_URI += "file://imx8mp-densitron.dts "
 
 # Add SDMA firmware config fragment and PM patch
 
-## # aplay test.wav 
-## ALSA lib ../../alsa-lib-1.2.6.1/src/confmisc.c:165:(snd_config_get_card) Cannot get card index for 0
-## aplay: main:831: audio open error: No such file or directory
-# SRC_URI += "file://0001-imx-sdma-fix-atomic-context-pm-runtime.patch " # No Cannot 
+## # Try to patch SAI3 driver issue
+# FIX: Solved loading iMx7 driver from DTS
+# SRC_URI += "file://0001-imx-sdma-fix-atomic-context-pm-runtime.patch " 
 
-SRC_URI += "file://sdma-firmware.cfg"
+
+
+# Add kernel configuration fragments
+SRC_URI += " \
+    file://imx8mp-densitron.cfg \
+    file://ti-tlv320aic3x.cfg \
+    file://inf1000.cfg \
+    file://sdma-firmware.cfg \
+"
 
 # Ensure firmware is available during kernel build
 DEPENDS += "firmware-imx"
@@ -40,8 +44,11 @@ do_configure:prepend() {
     # Copy the driver files
     cp ${WORKDIR}/sound/soc/codecs/inf1000.c ${S}/sound/soc/codecs/
     
-    # Ensure the kernel config fragment is applied
+    # Ensure all kernel config fragments are applied
     cat ${WORKDIR}/inf1000.cfg >> ${B}/.config
+    cat ${WORKDIR}/sdma-firmware.cfg >> ${B}/.config
+    cat ${WORKDIR}/imx8mp-densitron.cfg >> ${B}/.config
+    cat ${WORKDIR}/ti-tlv320aic3x.cfg >> ${B}/.config
 
     # Replace EVK DTS with our custom DTS - dirty but fast. 
     #     Fixme: create specific 'densitron' target machine
