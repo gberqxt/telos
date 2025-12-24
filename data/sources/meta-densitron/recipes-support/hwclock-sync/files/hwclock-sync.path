@@ -1,0 +1,10 @@
+[Unit]
+Description=Watch for NTP synchronization to trigger RTC sync
+
+[Path]
+PathExists=/run/systemd/timesync/synchronized
+Unit=hwclock-sync.service
+
+[Install]
+WantedBy=multi-user.target
+
