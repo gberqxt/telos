@@ -199,7 +199,6 @@ struct densitron_audio_priv {
     bool headphones_connected;
     bool audio_path_local;      /* true=local speaker, false=headphones */
     enum mic_source mic_source; /* Current microphone source */
-    bool auto_mic_switch;       /* Auto-switch mic on headset insertion */
     bool hardware_initialized;
     
     /* Work queue for interrupt handling */
@@ -787,7 +786,6 @@ static int fpga_init(struct densitron_audio_priv *priv)
     priv->headset_mic_gain = default_gain_hw;
     priv->front_mic_gain = default_gain_hw;
     priv->mic_source = MIC_SOURCE_FRONT;
-    priv->auto_mic_switch = true;  /* Enable automatic mic switching */
     
     /* --- initilize IRQ Section --- */
     ret = fpga_read_reg(spi, FPGA_REG_INT_STATUS, &active_irq);
@@ -1269,10 +1267,7 @@ static int mic_source_put(struct snd_kcontrol *kcontrol,
         
     if (val == priv->mic_source)
         return 0;
-    
-    /* Disable auto-switching when manually selecting */
-    priv->auto_mic_switch = false;
-    
+   
     ret = set_mic_source(priv, (enum mic_source)val);
     return ret ? ret : 1;
 }
@@ -1493,7 +1488,7 @@ static void fpga_irq_work(struct work_struct *work)
         if (hp_connected != priv->headphones_connected) {
             priv->headphones_connected = hp_connected;
             
-            /* Report jack status to ALSA - only if jack is initialized */
+            /* Report jack status to ALSA */
             if (priv->component && priv->component->card && priv->headphone_jack.jack) {
                 snd_soc_jack_report(&priv->headphone_jack, 
                             hp_connected ? SND_JACK_HEADPHONE : 0,
@@ -1507,16 +1502,14 @@ static void fpga_irq_work(struct work_struct *work)
                         "Failed to switch audio path: %d\n", ret);
             }
             
-            /* Automatic microphone switching (if enabled) */
-            if (priv->auto_mic_switch) {
-                enum mic_source new_source = hp_connected ? 
-                                             MIC_SOURCE_HEADSET : 
-                                             MIC_SOURCE_FRONT;
-                ret = set_mic_source(priv, new_source);
-                if (ret < 0) {
-                    dev_err(&priv->fpga_spi->dev, 
-                            "Failed to switch microphone source: %d\n", ret);
-                }
+            /* ALWAYS switch microphone on headset insertion/removal */
+            enum mic_source new_source = hp_connected ? 
+                                         MIC_SOURCE_HEADSET : 
+                                         MIC_SOURCE_FRONT;
+            ret = set_mic_source(priv, new_source);
+            if (ret < 0) {
+                dev_err(&priv->fpga_spi->dev, 
+                        "Failed to switch microphone source: %d\n", ret);
             }
         }
     }
