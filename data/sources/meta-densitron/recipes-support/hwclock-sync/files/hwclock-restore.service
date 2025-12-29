@@ -8,7 +8,7 @@ Conflicts=shutdown.target
 [Service]
 Type=oneshot
 ExecStartPre=/bin/sleep 1
-ExecStart=/sbin/hwclock -f /dev/rtc1 --hctosys
+ExecStart=/sbin/hwclock -f /dev/rtc0 --hctosys
 RemainAfterExit=yes
 
 [Install]
