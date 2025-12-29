@@ -38,7 +38,7 @@ except ImportError:
 # Import wavip module
 import wavip
 
-APP_VERSION = "2.2.4"
+APP_VERSION = "2.2.5"
 
 SESSION_ID = str(uuid.uuid4())
 
