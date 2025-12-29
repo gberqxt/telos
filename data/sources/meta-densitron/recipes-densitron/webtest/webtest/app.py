@@ -1897,31 +1897,28 @@ def api_wavip_set():
         return jsonify({"success": False, "error": str(e)})
         
 # ============================================================================
-# Autostart checkbox
+# GUI Animation Toggle Button
 # ============================================================================
-@app.route('/api/autostart/status')
-def api_autostart_status():
-    """Check if autostart is enabled"""
-    flag_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.autostart')
+@app.route('/api/gui_animation/status')
+def api_gui_animation_status():
+    """Check if GUI animation is enabled"""
+    flag_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.playguianimation')
     enabled = os.path.exists(flag_file)
     return jsonify({"success": True, "enabled": enabled})
 
-@app.route('/api/autostart/set', methods=['POST'])
-def api_autostart_set():
-    """Enable or disable autostart"""
+@app.route('/api/gui_animation/toggle', methods=['POST'])
+def api_gui_animation_toggle():
+    """Toggle GUI animation flag file"""
     try:
-        data = request.get_json()
-        enabled = data.get('enabled', False)
-        flag_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.autostart')
+        flag_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.playguianimation')
         
-        if enabled:
-            # Create flag file
+        if os.path.exists(flag_file):
+            os.remove(flag_file)
+            enabled = False
+        else:
             with open(flag_file, 'w') as f:
                 f.write('enabled')
-        else:
-            # Remove flag file
-            if os.path.exists(flag_file):
-                os.remove(flag_file)
+            enabled = True
         
         return jsonify({"success": True, "enabled": enabled})
     except Exception as e:

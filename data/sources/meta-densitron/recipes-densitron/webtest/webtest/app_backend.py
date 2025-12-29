@@ -107,9 +107,27 @@ class App:
         # auto fullscreen        
         self.win.fullscreen() 
         
+        # Start polling for animation flag file
+        self.animation_running = False
+        GLib.timeout_add(500, self.check_animation_flag)
+        
         Gtk.main()
 
+
+    def check_animation_flag(self):
+        """Poll for animation flag file and start/stop animation"""
+        animation_flag = os.path.join(BASE_DIR, '.playguianimation')
+        flag_exists = os.path.exists(animation_flag)
         
+        if flag_exists and not self.animation_running:
+            print("Animation flag detected - starting test sequence")
+            self.animation_running = True
+            self.start_test_sequence()
+        elif not flag_exists and self.animation_running:
+            print("Animation flag removed - animation will stop after current cycle")
+            self.animation_running = False
+        
+        return True  # Keep polling 
 
     def load_button_coordinates(self, filename):
         """Load button coordinates from CSV file"""
@@ -312,6 +330,17 @@ class App:
         last_button = [None]
         
         def press_next_button():
+            # Check if animation should continue
+            animation_flag = os.path.join(BASE_DIR, '.playguianimation')
+            if not os.path.exists(animation_flag):
+                # Release last button and stop
+                if last_button[0] is not None:
+                    self.highlight_button(last_button[0], False)
+                    self.write_event('release', last_button[0], 0, 0)
+                self.animation_running = False
+                print("TEST: Animation stopped (flag removed)")
+                return False
+            
             # Release previous button first
             if last_button[0] is not None:
                 self.highlight_button(last_button[0], False)
@@ -333,8 +362,10 @@ class App:
                 current_index[0] += 1
                 return True
             else:
-                print("TEST: Sequence complete")
-                return False
+                # Loop back to start
+                current_index[0] = 0
+                print("TEST: Sequence complete - restarting")
+                return True
         
         GLib.timeout_add(600, press_next_button)
         print(f"TEST: Starting sequence with {len(button_ids)} buttons")

@@ -1087,6 +1087,7 @@
             <h2>Physical Display Representation
                 <span class="full-view-container">
                     <button class="full-view-button" onclick="openFullView()">Open Full View</button>
+                    <button id="animationToggle" class="test-toggle-button" onclick="toggleAnimation()">Animation OFF</button>
                 </span>
             </h2>
             <div style="background: #f8fafc; padding: 16px; border-radius: 6px; border: 1px solid #e2e8f0;">
@@ -2788,6 +2789,47 @@
                 alert('Please allow pop-ups for this site to use Full View mode');
             }
         }
+        
+        async function checkAnimationStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/api/gui_animation/status`);
+                const data = await response.json();
+                if (data.success) {
+                    updateAnimationButton(data.enabled);
+                }
+            } catch (error) {
+                console.error('Error checking animation status:', error);
+            }
+        }
+
+        function updateAnimationButton(enabled) {
+            const btn = document.getElementById('animationToggle');
+            if (btn) {
+                if (enabled) {
+                    btn.textContent = 'Animation ON';
+                    btn.classList.add('active');
+                } else {
+                    btn.textContent = 'Animation OFF';
+                    btn.classList.remove('active');
+                }
+            }
+        }
+
+        async function toggleAnimation() {
+            try {
+                const response = await fetch(`${API_BASE}/api/gui_animation/toggle`, { method: 'POST' });
+                const data = await response.json();
+                if (data.success) {
+                    updateAnimationButton(data.enabled);
+                }
+            } catch (error) {
+                console.error('Error toggling animation:', error);
+            }
+        }
+
+        // Check animation status on page load
+        checkAnimationStatus();
+        
 
         async function loadButtonCoordinates() {
             try {
