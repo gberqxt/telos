@@ -1045,7 +1045,13 @@
                             <option value="">Loading files...</option>
                         </select>
                     </div>
-                    <button class="btn btn-success" id="btnPlay">Play</button>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <button class="btn btn-success" id="btnPlay">Play</button>                        
+                        <input type="checkbox" id="repeatCheckbox">                        
+                        <label for="repeatCheckbox" style="margin: 0; text-transform: none; display: inline-block; white-space: nowrap;">
+                            Repeat
+                        </label>
+                    </div>
                     <div class="status-text" id="playStatus">Select a file to play</div>
                 </div>
             </div>
@@ -2346,11 +2352,12 @@
         // Play button
         let isPlaying = false;
         let playbackCheckInterval = null;
-        
+
         document.getElementById('btnPlay').addEventListener('click', async () => {
             const btn = document.getElementById('btnPlay');
             const status = document.getElementById('playStatus');
             const filename = document.getElementById('playFileSelect').value;
+            const repeatCheckbox = document.getElementById('repeatCheckbox');
 
             if (!filename) {
                 showStatus('Please select a file', true);
@@ -2378,12 +2385,24 @@
                             const statusResp = await fetch(`${API_BASE}/api/playback_status`);
                             const statusData = await statusResp.json();
                             if (!statusData.is_playing) {
-                                isPlaying = false;
-                                btn.textContent = 'Play';
-                                btn.style.background = '#475569';
-                                status.textContent = 'Select a file to play';
-                                status.style.color = '#718096';
-                                clearInterval(playbackCheckInterval);
+                                // Check repeat checkbox when playback ends
+                                if (repeatCheckbox.checked) {
+                                    // Restart playback
+                                    const restartResp = await fetch(`${API_BASE}/api/play_audio_file`, {
+                                        method: 'POST',
+                                        headers: {'Content-Type': 'application/json'},
+                                        body: JSON.stringify({filename: filename, action: 'start'})
+                                    });
+                                    showStatus('Repeating playback...', false);
+                                } else {
+                                    // Stop playback
+                                    isPlaying = false;
+                                    btn.textContent = 'Play';
+                                    btn.style.background = '#475569';
+                                    status.textContent = 'Select a file to play';
+                                    status.style.color = '#718096';
+                                    clearInterval(playbackCheckInterval);
+                                }
                             }
                         }, 500);
                     } else {
