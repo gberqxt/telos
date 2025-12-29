@@ -1925,6 +1925,35 @@ def api_gui_animation_toggle():
         return jsonify({"success": False, "error": str(e)})
 
 # ============================================================================
+# Play IP at startup / autostart
+# ============================================================================
+@app.route('/api/autostart/status')
+def api_autostart_status():
+    """Check if autostart is enabled"""
+    flag_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.autostart')
+    enabled = os.path.exists(flag_file)
+    return jsonify({"success": True, "enabled": enabled})
+
+@app.route('/api/autostart/set', methods=['POST'])
+def api_autostart_set():
+    """Enable or disable autostart"""
+    try:
+        data = request.get_json()
+        enabled = data.get('enabled', False)
+        flag_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.autostart')
+        
+        if enabled:
+            with open(flag_file, 'w') as f:
+                f.write('enabled')
+        else:
+            if os.path.exists(flag_file):
+                os.remove(flag_file)
+        
+        return jsonify({"success": True, "enabled": enabled})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+        
+# ============================================================================
 # Main Entry Point
 # ============================================================================
 
