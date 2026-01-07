@@ -9,7 +9,7 @@
 #include "imx8mp.dtsi"
 
 / {
-	model = "NXP i.MX8MPlus - Densitron v1.3 ";
+	model = "NXP i.MX8MPlus - Densitron v1.4 ";
 	compatible = "fsl,imx8mp-evk", "fsl,imx8mp";
 
 	aliases {
@@ -1149,7 +1149,7 @@ deninf: deninf-codec {
     fsl,sai-mclk-direction-output;
     
     // Force specific operation mode
-    fsl,sai-synchronous-rx;
+    // fsl,sai-synchronous-rx;
     fsl,sai-mclk-source = <1>;       // Use MCLK1 
     
     status = "okay";
