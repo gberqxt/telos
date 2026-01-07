@@ -16,6 +16,7 @@ SRC_URI = "file://app_backend.py \
            file://sound/chirp_sine_100-10kHz_24bit_48000-stereo.wav \
            file://sound/chirp_sine_100-10kHz_24bit_96000-stereo.wav \
            file://sound/chirp_sine_100-10kHz_32bit_32000-stereo.wav \
+           file://sound/1000Hz_stereo_16bit-signed_48kHz.wav \
            file://sound/Fytch-Fading_light.wav \
            file://webtest.service \
           "
